@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dungeon of Shadows - Fantasy RPG</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="game-header">
+      <div class="header-titles">
+        <h1 class="game-title">DUNGEON OF SHADOWS</h1>
+        <p class="game-subtitle">A Dark Medieval Fantasy Text RPG</p>
+      </div>
+      <div class="header-actions">
+        <button id="btn-save-game" class="btn btn-secondary" title="Save current progress">Save Game</button>
+        <button id="btn-load-game" class="btn btn-secondary" title="Load saved progress">Load Game</button>
+        <button id="btn-new-game" class="btn btn-danger" title="Start a fresh adventure">New Game</button>
+      </div>
+    </header>
+
+    <!-- Character Creation View -->
+    <main id="creation-view" class="view-panel">
+      <div class="parchment-card creation-card">
+        <h2>Create Your Hero</h2>
+        <form id="character-creation-form" onsubmit="return false;">
+          <div class="form-group">
+            <label for="char-name">Hero Name</label>
+            <input type="text" id="char-name" name="char-name" maxlength="20" placeholder="e.g., Eldrin the Brave" required autocomplete="off">
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="char-class">Class</label>
+              <select id="char-class" name="char-class" required>
+                <option value="Fighter">Fighter (+2 STR, +2 CON, High HP)</option>
+                <option value="Wizard">Wizard (+3 INT, +1 WIS, High Attack)</option>
+                <option value="Rogue">Rogue (+3 DEX, +1 CHA, High Defense)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="char-race">Race</label>
+              <select id="char-race" name="char-race" required>
+                <option value="Human">Human (+1 All Ability Scores)</option>
+                <option value="Elf">Elf (+2 DEX, +1 INT)</option>
+                <option value="Dwarf">Dwarf (+2 CON, +1 STR)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Live Preview Box -->
+          <div class="preview-box">
+            <h3>Character Preview</h3>
+            <div id="creation-preview-stats" class="preview-stats">
+              <!-- Populated dynamically by script.js -->
+            </div>
+            <p id="class-description" class="preview-desc"></p>
+          </div>
+
+          <button id="btn-start-adventure" type="button" class="btn btn-primary btn-large">Enter the Dungeon</button>
+        </form>
+      </div>
+    </main>
+
+    <!-- Main Game View -->
+    <main id="game-view" class="view-panel hidden">
+      <div class="game-grid">
+
+        <!-- Panel 1: Character Sheet -->
+        <section class="parchment-card panel-character" aria-labelledby="char-heading">
+          <h2 id="char-heading" class="panel-title">Character Sheet</h2>
+          <div class="char-header-info">
+            <div class="char-name-display" id="display-char-name">Hero Name</div>
+            <div class="char-subtitle-display">
+              Level <span id="display-level">1</span> <span id="display-race">Human</span> <span id="display-class">Fighter</span>
+            </div>
+          </div>
+
+          <div class="status-bars">
+            <div class="bar-group">
+              <div class="bar-label">
+                <span>Hit Points (HP)</span>
+                <span id="display-hp-text">20 / 20</span>
+              </div>
+              <div class="meter-bar hp-meter">
+                <div id="display-hp-bar" class="meter-fill hp-fill" style="width: 100%;"></div>
+              </div>
+            </div>
+
+            <div class="bar-group">
+              <div class="bar-label">
+                <span>Experience (XP)</span>
+                <span id="display-xp-text">0 / 100</span>
+              </div>
+              <div class="meter-bar xp-meter">
+                <div id="display-xp-bar" class="meter-fill xp-fill" style="width: 0%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="combat-stats-summary">
+            <div class="stat-badge">
+              <span class="badge-label">Attack</span>
+              <span id="display-attack" class="badge-value">5</span>
+            </div>
+            <div class="stat-badge">
+              <span class="badge-label">Defense</span>
+              <span id="display-defense" class="badge-value">12</span>
+            </div>
+            <div class="stat-badge">
+              <span class="badge-label">Gold</span>
+              <span id="display-gold" class="badge-value">10</span>
+            </div>
+          </div>
+
+          <div class="ability-scores-grid">
+            <div class="ability-box">
+              <span class="ability-name">STR</span>
+              <span id="display-str" class="ability-val">10</span>
+            </div>
+            <div class="ability-box">
+              <span class="ability-name">DEX</span>
+              <span id="display-dex" class="ability-val">10</span>
+            </div>
+            <div class="ability-box">
+              <span class="ability-name">CON</span>
+              <span id="display-con" class="ability-val">10</span>
+            </div>
+            <div class="ability-box">
+              <span class="ability-name">INT</span>
+              <span id="display-int" class="ability-val">10</span>
+            </div>
+            <div class="ability-box">
+              <span class="ability-name">WIS</span>
+              <span id="display-wis" class="ability-val">10</span>
+            </div>
+            <div class="ability-box">
+              <span class="ability-name">CHA</span>
+              <span id="display-cha" class="ability-val">10</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Panel 2: Dungeon View -->
+        <section class="parchment-card panel-dungeon" aria-labelledby="dungeon-heading">
+          <div class="dungeon-header">
+            <h2 id="dungeon-heading" class="panel-title">Dungeon Area</h2>
+            <div id="room-badge" class="room-badge">Room 1 / 10</div>
+          </div>
+
+          <div id="room-content" class="room-content">
+            <h3 id="room-title" class="room-title">Entering the Shadows</h3>
+            <p id="room-description" class="room-desc">You step into the damp, torch-lit stone hallway...</p>
+
+            <!-- Monster display box (shown when fighting) -->
+            <div id="monster-box" class="monster-card hidden">
+              <div class="monster-header">
+                <h4 id="monster-name">Goblin</h4>
+                <div id="monster-hp-text" class="monster-hp-text">HP: 12/12</div>
+              </div>
+              <div class="meter-bar enemy-hp-meter">
+                <div id="monster-hp-bar" class="meter-fill enemy-hp-fill" style="width: 100%;"></div>
+              </div>
+              <p id="monster-desc" class="monster-desc">A skulking green-skinned creature wielding a rusty dagger.</p>
+            </div>
+          </div>
+
+          <!-- Dungeon Actions / Controls -->
+          <div class="dungeon-actions">
+            <!-- Non-combat action -->
+            <div id="non-combat-controls" class="action-buttons-group">
+              <button id="btn-room-action" class="btn btn-action">Proceed to Room</button>
+            </div>
+
+            <!-- Combat actions -->
+            <div id="combat-controls" class="action-buttons-group hidden">
+              <button id="btn-attack" class="btn btn-combat btn-attack">Attack</button>
+              <button id="btn-defend" class="btn btn-combat btn-defend">Defend</button>
+              <button id="btn-combat-potion" class="btn btn-combat btn-potion">Use Potion</button>
+              <button id="btn-run" class="btn btn-combat btn-run">Run</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Panel 3: Inventory & Equipment -->
+        <section class="parchment-card panel-inventory" aria-labelledby="inventory-heading">
+          <h2 id="inventory-heading" class="panel-title">Inventory</h2>
+
+          <div class="equipment-section">
+            <div class="section-subtitle">Equipped Gear</div>
+            <div class="equipped-slots">
+              <div class="slot-item">
+                <span class="slot-label">Weapon:</span>
+                <span id="equipped-weapon-name" class="slot-value">None</span>
+                <button id="btn-unequip-weapon" class="btn btn-mini hidden" title="Unequip Weapon">Unequip</button>
+              </div>
+              <div class="slot-item">
+                <span class="slot-label">Armor/Shield:</span>
+                <span id="equipped-armor-name" class="slot-value">None</span>
+                <button id="btn-unequip-armor" class="btn btn-mini hidden" title="Unequip Armor">Unequip</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="items-section">
+            <div class="section-subtitle">Carrying Items</div>
+            <div id="inventory-list" class="inventory-list">
+              <!-- Dynamically rendered list of items -->
+            </div>
+          </div>
+        </section>
+
+        <!-- Panel 4: Combat & Event Log -->
+        <section class="parchment-card panel-log" aria-labelledby="log-heading">
+          <div class="log-header">
+            <h2 id="log-heading" class="panel-title">Adventure Log</h2>
+            <button id="btn-clear-log" class="btn btn-mini" title="Clear log messages">Clear</button>
+          </div>
+          <div id="combat-log" class="combat-log" role="log" aria-live="polite" aria-relevant="additions">
+            <!-- Dynamic log entries will append here -->
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+    <!-- Victory Screen -->
+    <div id="victory-modal" class="modal-backdrop hidden">
+      <div class="parchment-card modal-card victory-card">
+        <h2 class="modal-title victory-title">VICTORY!</h2>
+        <p class="modal-narrative">The Dark Knight has fallen.<br>You have conquered the Dungeon of Shadows!</p>
+
+        <div class="final-stats-box">
+          <h3>Hero Summary</h3>
+          <ul id="victory-stats-list" class="stats-summary-list">
+            <!-- Populated by JS -->
+          </ul>
+        </div>
+
+        <button id="btn-victory-restart" class="btn btn-primary btn-large">Start New Adventure</button>
+      </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="gameover-modal" class="modal-backdrop hidden">
+      <div class="parchment-card modal-card gameover-card">
+        <h2 class="modal-title gameover-title">GAME OVER</h2>
+        <p class="modal-narrative">Your hero has fallen in the Dungeon of Shadows.</p>
+
+        <div class="final-stats-box">
+          <h3>Hero Summary</h3>
+          <ul id="gameover-stats-list" class="stats-summary-list">
+            <!-- Populated by JS -->
+          </ul>
+        </div>
+
+        <button id="btn-gameover-restart" class="btn btn-danger btn-large">Start New Game</button>
+      </div>
+    </div>
+
+    <!-- Toast Messages -->
+    <div id="toast-container" class="toast-container" aria-live="assertive"></div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
