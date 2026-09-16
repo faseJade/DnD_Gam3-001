@@ -1,68 +1,60 @@
-# Dungeon of Shadows - Fantasy RPG
+# Dungeon of Shadows - Procedural Open-World Fantasy RPG
 
-A clean, polished, fully playable **D&D-inspired text fantasy RPG** built with vanilla HTML, CSS, and JavaScript. The game runs directly in any modern web browser without requiring external dependencies, libraries, build tools, or an internet connection.
+A procedurally generated, replayable, D&D-inspired open-world fantasy RPG running entirely in the browser using HTML5, CSS3, and vanilla JavaScript over the `file://` protocol.
 
 ---
 
-## Features
+## Technical Overview & Requirements
 
-- **Atmospheric Dark Fantasy Design**: Parchment panels, textured borders, responsive layout, clear HP/XP meters, and medieval typography.
-- **Character Creation**: Select from 3 distinct classes (**Fighter**, **Wizard**, **Rogue**) and 3 fantasy races (**Human**, **Elf**, **Dwarf**) with customized ability score bonuses.
-- **Dice System**: Standard d4, d6, d8, d10, d12, and d20 dice notation engine handling natural 20 critical hits (maximum + rolled damage) and natural 1 critical misses.
-- **Turn-Based Combat**: Complete turn loop offering Attack, Defend (+4 Defense bonus for next enemy attack), Use Potion, and Run options.
-- **Dynamic Dungeon Progression**: 10 rooms featuring random encounters (Monsters, Treasure, Traps, Healing Shrines, Empty rooms) climaxing with the **Dark Knight** boss in Room 10.
-- **Inventory & Equipment**: Dynamic inventory management with weapon and shield equipping that directly modifies attack and defense stats. Safe potion consumption with full-HP checks.
-- **Leveling & Advancement**: Multi-level XP threshold system increasing Max HP, fully restoring health, and boosting primary combat attributes upon level up.
-- **Saving & Loading**: Seamless `localStorage` save and load functionality with error validation and corrupted save recovery.
-- **Accessibility**: Semantic HTML elements, ARIA live region combat logs, keyboard focus rings, and high text contrast.
+- **Zero External Dependencies**: Pure HTML, CSS, and JS (No Node.js, npm, frameworks, or backend required).
+- **Procedural Open-World Generation**: Deterministic seeded island terrain (value noise), biomes, settlements, A* road networks, and procedurally regenerating dungeons.
+- **6 Classes & 6 Races**: Fighter, Wizard, Rogue, Cleric, Ranger, Paladin & Human, Elf, Dwarf, Halfling, Orc, Ignan.
+- **D&D Combat & Skill Checks**: d20-based attack rolls, signature class skills, critical hits (natural 20) and critical misses (natural 1).
+- **Special Story Arc**: Hand-crafted 10-room **Dungeon of Shadows** containing the Dark Knight boss fight. Defeating the Dark Knight unlocks the option to continue exploring the open world.
+- **Save System & Migration**: Seamless `localStorage` state persistence with versioning and corrupted save protection.
+- **Optional LLM Narrator Abstraction Layer**: Flavour text generation supporting local/OpenAI-compatible endpoints with automatic procedural fallbacks.
+- **In-Browser Test Runner**: Run `tests.html` directly in the browser to verify seed reproducibility, dice bounds, clamping, and save roundtrips.
 
 ---
 
 ## File Structure
 
 ```text
-.
-├── index.html   # Core HTML5 layout and modal overlays
-├── style.css    # RPG theme styling, responsive layout, and animations
-├── script.js   # Game state, dice engine, combat state machine, and UI binder
-└── README.md    # Documentation and game rules
+index.html              # Main HTML entry point
+style.css               # RPG parchment theme and responsive styles
+script.js               # Bootstrap and UI orchestrator
+js/
+  rng.js               # Seeded cyrb53 hash + sfc32 PRNG
+  dice.js              # Dice notation engine (rollDie, rollDice)
+  data.js              # Class, Race, and Item static catalogs
+  state.js             # Central state object & clamping helpers
+  save.js              # Save system & migration
+  time.js              # Turn-based calendar system
+  terrain.js           # 2D value noise island terrain generator
+  towns.js             # Settlement & city generator
+  roads.js             # A* pathfinding & road network generator
+  npcs.js              # Persistent NPC & rumour generator
+  monsters.js          # Monster catalog
+  loot.js              # Loot & equipment generator
+  dungeons.js          # Procedural dungeon generator & regeneration engine
+  quests.js            # Guild quest & chain generator
+  events.js            # Travel & exploration skill check events
+  events_world.js      # Living world events & endgame locations
+  reputation.js        # Settlement & guild reputation system
+  combat.js            # Turn-based combat state machine
+  narrator.js          # LLM narrator abstraction layer
+  map.js               # Canvas map renderer with fog of war
+  world.js             # World generation orchestrator
+  debug.js             # Developer debug tools (?debug=true)
+tests.html             # In-browser test runner
+tests/tests.js         # Automated test suite
+README.md              # Project documentation
 ```
 
 ---
 
-## How to Run the Game
+## How to Run & Test
 
-1. Double-click or open `index.html` in any modern web browser (Chrome, Firefox, Safari, Edge).
-2. No local server, node packages, or build steps are needed.
-
----
-
-## Character Classes & Races
-
-### Classes
-- **Fighter**: High health pool and raw melee power. Primary Stat: **Strength**.
-- **Wizard**: High spell attack potential. Primary Stat: **Intelligence**.
-- **Rogue**: Nimble and difficult to hit. Primary Stat: **Dexterity**.
-
-### Races
-- **Human**: +1 to all Ability Scores.
-- **Elf**: +2 Dexterity, +1 Intelligence.
-- **Dwarf**: +2 Constitution, +1 Strength.
-
----
-
-## Combat & Gameplay Mechanics
-
-1. **Attack Calculation**: `D20 + Class/Equipment Attack Bonus >= Enemy Defense`.
-   - **Natural 20**: Critical Hit! Deals maximum weapon damage plus roll bonus.
-   - **Natural 1**: Critical Miss! The attack fails completely.
-2. **Enemy Turn**: Surviving enemies automatically counter-attack after player actions.
-3. **Defend**: Increases player defense by +4 until after the enemy's next attack.
-4. **Run**: DC 11 Dexterity check to flee normal monsters (cannot flee the Room 10 boss).
-5. **Potions**: Restores 18 HP (Health Potion) or 40 HP (Greater Health Potion). Potions cannot be consumed if already at Max HP.
-
----
-
-## Saving & Loading
-
-Click **Save Game** in the top navigation header at any time to save progress to browser `localStorage`. Click **Load Game** on any session to restore character stats, inventory, equipment, and current dungeon room.
+1. Double-click `index.html` in any web browser to play the game.
+2. Double-click `tests.html` to run the automated in-browser unit tests.
+3. Append `?debug=true` to `index.html` in the browser address bar to enable developer debug controls.

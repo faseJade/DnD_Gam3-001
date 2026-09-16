@@ -1,284 +1,13 @@
-/* Dungeon of Shadows - Game Script */
+/* Dungeon of Shadows - Main Bootstrap & UI Orchestrator */
 
 (function () {
   'use strict';
 
-  // --- SAVE STORAGE KEY ---
-  const SAVE_KEY = 'dungeon_of_shadows_save';
-
-  // --- DICE SYSTEM ---
-  function rollDie(faces) {
-    if (!faces || faces < 1) return 1;
-    return Math.floor(Math.random() * faces) + 1;
-  }
-
-  function rollDiceNotation(diceString) {
-    // e.g. "1d6+2" or "1d8"
-    if (!diceString) return { total: 0, rolls: [], bonus: 0 };
-    const parts = diceString.toLowerCase().split('+');
-    const dicePart = parts[0].trim(); // "1d6"
-    const bonus = parts[1] ? parseInt(parts[1].trim(), 10) || 0 : 0;
-
-    const [numStr, facesStr] = dicePart.split('d');
-    const num = parseInt(numStr, 10) || 1;
-    const faces = parseInt(facesStr, 10) || 6;
-
-    let rolls = [];
-    let total = 0;
-    for (let i = 0; i < num; i++) {
-      const r = rollDie(faces);
-      rolls.push(r);
-      total += r;
-    }
-    total += bonus;
-    return { total, rolls, bonus };
-  }
-
-  // --- CLASS & RACE DEFINITIONS ---
-  const CLASSES = {
-    Fighter: {
-      name: 'Fighter',
-      baseStats: { STR: 14, DEX: 12, CON: 14, INT: 10, WIS: 10, CHA: 10 },
-      baseHp: 24,
-      hpPerLevel: 10,
-      primaryStat: 'STR',
-      desc: 'Master of martial combat, relying on raw strength and thick armor.'
-    },
-    Wizard: {
-      name: 'Wizard',
-      baseStats: { STR: 8, DEX: 12, CON: 10, INT: 16, WIS: 14, CHA: 10 },
-      baseHp: 16,
-      hpPerLevel: 6,
-      primaryStat: 'INT',
-      desc: 'Scholarly spellcaster weaving arcane forces to decimate enemies.'
-    },
-    Rogue: {
-      name: 'Rogue',
-      baseStats: { STR: 10, DEX: 16, CON: 12, INT: 10, WIS: 10, CHA: 14 },
-      baseHp: 20,
-      hpPerLevel: 8,
-      primaryStat: 'DEX',
-      desc: 'Agile trickster specializing in swift strikes and elusive defense.'
-    }
-  };
-
-  const RACES = {
-    Human: {
-      name: 'Human',
-      bonuses: { STR: 1, DEX: 1, CON: 1, INT: 1, WIS: 1, CHA: 1 },
-      desc: 'Versatile and adaptable, gaining +1 to all ability scores.'
-    },
-    Elf: {
-      name: 'Elf',
-      bonuses: { STR: 0, DEX: 2, CON: 0, INT: 1, WIS: 0, CHA: 0 },
-      desc: 'Graceful and keen-minded, gaining +2 DEX and +1 INT.'
-    },
-    Dwarf: {
-      name: 'Dwarf',
-      bonuses: { STR: 1, DEX: 0, CON: 2, INT: 0, WIS: 0, CHA: 0 },
-      desc: 'Hardy and strong, gaining +2 CON and +1 STR.'
-    }
-  };
-
-  // --- MONSTER CATALOG ---
-  const MONSTER_CATALOG = {
-    Goblin: {
-      name: 'Goblin',
-      desc: 'A skulking green-skinned creature wielding a rusty dagger.',
-      maxHp: 12,
-      attackBonus: 2,
-      defense: 10,
-      damageDice: '1d6+1',
-      xpReward: 30,
-      goldReward: 12
-    },
-    Skeleton: {
-      name: 'Skeleton',
-      desc: 'Animated bones rattling in the dark with an old iron shortsword.',
-      maxHp: 18,
-      attackBonus: 3,
-      defense: 12,
-      damageDice: '1d6+2',
-      xpReward: 45,
-      goldReward: 18
-    },
-    GiantSpider: {
-      name: 'Giant Spider',
-      desc: 'A massive chitinous arachnid dripping venomous slaver from its fangs.',
-      maxHp: 24,
-      attackBonus: 4,
-      defense: 13,
-      damageDice: '1d8+2',
-      xpReward: 60,
-      goldReward: 25
-    },
-    Orc: {
-      name: 'Orc',
-      desc: 'A brutal warrior clad in heavy leather, swinging a crude battleaxe.',
-      maxHp: 32,
-      attackBonus: 5,
-      defense: 14,
-      damageDice: '1d10+2',
-      xpReward: 80,
-      goldReward: 35
-    },
-    DarkKnight: {
-      name: 'Dark Knight',
-      desc: 'The lord of the Dungeon of Shadows, encased in abyssal plate armor.',
-      maxHp: 65,
-      attackBonus: 7,
-      defense: 16,
-      damageDice: '2d6+4',
-      xpReward: 250,
-      goldReward: 150,
-      isBoss: true
-    }
-  };
-
-  // --- ITEM TEMPLATES ---
-  const ITEMS = {
-    potion_health: {
-      id: 'potion_health',
-      name: 'Health Potion',
-      type: 'potion',
-      healAmount: 18,
-      desc: 'Restores 18 HP when consumed.'
-    },
-    potion_greater: {
-      id: 'potion_greater',
-      name: 'Greater Health Potion',
-      type: 'potion',
-      healAmount: 40,
-      desc: 'Restores 40 HP when consumed.'
-    },
-    sword: {
-      id: 'sword',
-      name: 'Sword',
-      type: 'weapon',
-      attackBonus: 3,
-      damageDice: '1d8',
-      desc: 'A sturdy steel longsword. (+3 Attack)'
-    },
-    wand: {
-      id: 'wand',
-      name: 'Wand',
-      type: 'weapon',
-      attackBonus: 3,
-      damageDice: '1d6+1',
-      desc: 'A polished arcane wand emitting faint sparkles. (+3 Attack)'
-    },
-    shield: {
-      id: 'shield',
-      name: 'Shield',
-      type: 'armor',
-      defenseBonus: 3,
-      desc: 'A heavy wooden shield reinforced with iron. (+3 Defense)'
-    }
-  };
-
-  // --- GAME STATE ---
-  let gameState = null;
-
-  function createInitialGameState(name, className, raceName) {
-    const cls = CLASSES[className] || CLASSES.Fighter;
-    const race = RACES[raceName] || RACES.Human;
-
-    const stats = {
-      STR: cls.baseStats.STR + race.bonuses.STR,
-      DEX: cls.baseStats.DEX + race.bonuses.DEX,
-      CON: cls.baseStats.CON + race.bonuses.CON,
-      INT: cls.baseStats.INT + race.bonuses.INT,
-      WIS: cls.baseStats.WIS + race.bonuses.WIS,
-      CHA: cls.baseStats.CHA + race.bonuses.CHA
-    };
-
-    const maxHp = cls.baseHp + Math.floor((stats.CON - 10) / 2);
-
-    return {
-      version: 1,
-      inGame: true,
-      character: {
-        name: name.trim() || 'Hero',
-        className: cls.name,
-        raceName: race.name,
-        level: 1,
-        xp: 0,
-        hp: maxHp,
-        maxHp: maxHp,
-        gold: 15,
-        stats: stats,
-        monstersDefeated: 0
-      },
-      equipment: {
-        weapon: null, // item object or null
-        armor: null   // item object or null
-      },
-      inventory: [
-        { item: ITEMS.potion_health, quantity: 2 },
-        { item: ITEMS.potion_greater, quantity: 1 },
-        { item: ITEMS.sword, quantity: 1 },
-        { item: ITEMS.shield, quantity: 1 },
-        { item: ITEMS.wand, quantity: 1 }
-      ],
-      dungeon: {
-        currentRoom: 1,
-        totalRooms: 10,
-        roomState: null, // { type: 'empty'|'treasure'|'trap'|'shrine'|'monster', monster: {...}, cleared: boolean }
-      },
-      combat: {
-        active: false,
-        isPlayerDefending: false,
-        monster: null
-      },
-      logs: []
-    };
-  }
-
-  // --- DERIVED STAT CALCULATIONS ---
-  function getStatModifier(statVal) {
-    return Math.floor((statVal - 10) / 2);
-  }
-
-  function calculatePlayerAttack(state) {
-    if (!state || !state.character) return 0;
-    const c = state.character;
-    const cls = CLASSES[c.className] || CLASSES.Fighter;
-
-    // Choose modifier based on class primary stat
-    const statMod = getStatModifier(c.stats[cls.primaryStat] || 10);
-    const weaponBonus = state.equipment.weapon ? (state.equipment.weapon.attackBonus || 0) : 0;
-
-    return Math.max(0, statMod + weaponBonus);
-  }
-
-  function calculatePlayerDefense(state) {
-    if (!state || !state.character) return 10;
-    const c = state.character;
-    const dexMod = getStatModifier(c.stats.DEX || 10);
-    const armorBonus = state.equipment.armor ? (state.equipment.armor.defenseBonus || 0) : 0;
-    const defendBonus = state.combat.isPlayerDefending ? 4 : 0;
-
-    return Math.max(10, 10 + dexMod + armorBonus + defendBonus);
-  }
-
-  function getRequiredXpForLevel(level) {
-    // Level 1 -> 100, Level 2 -> 250, Level 3 -> 450, Level 4 -> 700...
-    return level * 100 + (level - 1) * 50;
-  }
-
-  // --- LOGGING ---
-  function addLog(message, type = 'info') {
-    if (!gameState) return;
-    const entry = { text: message, type: type, timestamp: new Date().toLocaleTimeString() };
-    gameState.logs.push(entry);
-
-    // Keep log buffer reasonable (max 150 entries)
-    if (gameState.logs.length > 150) {
-      gameState.logs.shift();
-    }
-
-    renderLogEntry(entry);
-  }
+  let state = null;
+  let world = null;
+  let mapSystem = null;
+  let eventGen = null;
+  let dungeonGen = null;
 
   function showToast(message) {
     const container = document.getElementById('toast-container');
@@ -288,756 +17,37 @@
     toast.textContent = message;
     container.appendChild(toast);
     setTimeout(() => {
-      if (toast.parentNode) {
-        toast.parentNode.removeChild(toast);
-      }
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
     }, 3000);
   }
 
-  // --- ROOM GENERATION ---
-  function generateRoomState(roomNumber) {
-    if (roomNumber >= 10) {
-      // Room 10 is always the Dark Knight Boss
-      const bossData = JSON.parse(JSON.stringify(MONSTER_CATALOG.DarkKnight));
-      bossData.currentHp = bossData.maxHp;
-      return {
-        type: 'monster',
-        monster: bossData,
-        cleared: false,
-        title: 'Room 10: The Shadow Sanctum',
-        desc: 'An ominous throne room swirled in crimson mist. At center stands the Dark Knight, brandishing an abyssal blade!'
-      };
-    }
+  function addLog(text, type = 'info') {
+    if (!state) return;
+    const entry = { text: text, type: type, timestamp: new Date().toLocaleTimeString() };
+    state.logs.push(entry);
+    if (state.logs.length > 200) state.logs.shift();
 
-    // Room titles and descriptions
-    const roomTitles = [
-      'Forgotten Corridor',
-      'Whispering Crypt',
-      'Sunken Antechamber',
-      'Dusty Armory',
-      'Echoing Cavern',
-      'Gloomy Passageway',
-      'Desolate Guardpost',
-      'Subterranean Vault',
-      'Obsidian Hall'
-    ];
-
-    const title = `Room ${roomNumber}: ${roomTitles[roomNumber - 1] || 'Dungeon Depth'}`;
-
-    // Event probability:
-    // Room 1 is guaranteed Monster or Empty/Treasure (let's make Room 1 a weak monster or empty)
-    const rand = Math.random();
-    let type = 'monster';
-    let monsterKey = 'Goblin';
-
-    if (roomNumber === 1) {
-      type = rand < 0.7 ? 'monster' : 'treasure';
-      monsterKey = 'Goblin';
-    } else {
-      if (rand < 0.55) {
-        type = 'monster';
-        // Pick monster based on room depth
-        if (roomNumber <= 3) {
-          monsterKey = Math.random() < 0.6 ? 'Goblin' : 'Skeleton';
-        } else if (roomNumber <= 6) {
-          const mRand = Math.random();
-          monsterKey = mRand < 0.4 ? 'Skeleton' : (mRand < 0.7 ? 'GiantSpider' : 'Orc');
-        } else {
-          monsterKey = Math.random() < 0.5 ? 'GiantSpider' : 'Orc';
-        }
-      } else if (rand < 0.70) {
-        type = 'treasure';
-      } else if (rand < 0.85) {
-        type = 'trap';
-      } else if (rand < 0.95) {
-        type = 'shrine';
-      } else {
-        type = 'empty';
-      }
-    }
-
-    let monster = null;
-    let desc = '';
-
-    if (type === 'monster') {
-      const template = MONSTER_CATALOG[monsterKey];
-      monster = JSON.parse(JSON.stringify(template));
-      monster.currentHp = monster.maxHp;
-      desc = `You enter the room and encounter a hostile ${monster.name}!`;
-    } else if (type === 'treasure') {
-      desc = 'You find a dusty chest glittering with rewards in the corner of the room.';
-    } else if (type === 'trap') {
-      desc = 'As you step inside, a hidden tripwire springs a mechanical trap!';
-    } else if (type === 'shrine') {
-      desc = 'A glowing ancient altar rests here, emitting a warm, soothing light.';
-    } else {
-      desc = 'The room is silent and empty. Old cobwebs hang from the stone ceiling.';
-    }
-
-    return {
-      type: type,
-      monster: monster,
-      cleared: false,
-      title: title,
-      desc: desc
-    };
-  }
-
-  // --- COMBAT CONTROLLER ---
-  function startCombat(monster) {
-    gameState.combat.active = true;
-    gameState.combat.isPlayerDefending = false;
-    gameState.combat.monster = monster;
-    addLog(`Encountered ${monster.name}! ${monster.desc}`, 'system');
-    render();
-  }
-
-  function handlePlayerAttack() {
-    if (!gameState || !gameState.combat.active || !gameState.combat.monster) return;
-
-    const c = gameState.character;
-    const monster = gameState.combat.monster;
-    const attackBonus = calculatePlayerAttack(gameState);
-
-    const d20Roll = rollDie(20);
-    const totalAttack = d20Roll + attackBonus;
-
-    let isCrit = d20Roll === 20;
-    let isCritMiss = d20Roll === 1;
-    let damage = 0;
-
-    if (isCritMiss) {
-      addLog(`You roll ${d20Roll} + ${attackBonus} = ${totalAttack}. Critical miss! Your attack completely whiffs.`, 'miss');
-    } else if (isCrit) {
-      // Weapon damage or base d6
-      let weaponDice = gameState.equipment.weapon ? gameState.equipment.weapon.damageDice : '1d6';
-      const diceRes = rollDiceNotation(weaponDice);
-      const strMod = getStatModifier(c.stats.STR);
-      // Crit damage = max possible dice + roll + bonus
-      const maxDiceVal = parseInt(weaponDice.split('d')[1] || '6', 10);
-      damage = maxDiceVal + diceRes.total + Math.max(0, strMod);
-
-      monster.currentHp = Math.max(0, monster.currentHp - damage);
-      addLog(`NATURAL 20! Critical Hit! You roll ${d20Roll} + ${attackBonus} = ${totalAttack}. You deal ${damage} massive damage!`, 'player-crit');
-    } else if (totalAttack >= monster.defense) {
-      let weaponDice = gameState.equipment.weapon ? gameState.equipment.weapon.damageDice : '1d6';
-      const diceRes = rollDiceNotation(weaponDice);
-      const strMod = getStatModifier(c.stats.STR);
-      damage = Math.max(1, diceRes.total + strMod);
-
-      monster.currentHp = Math.max(0, monster.currentHp - damage);
-      addLog(`You roll ${d20Roll} + ${attackBonus} = ${totalAttack} vs Def ${monster.defense}. Hit! You deal ${damage} damage.`, 'player-hit');
-    } else {
-      addLog(`You roll ${d20Roll} + ${attackBonus} = ${totalAttack} vs Def ${monster.defense}. Miss!`, 'miss');
-    }
-
-    // Check monster death
-    if (monster.currentHp <= 0) {
-      handleMonsterDefeated(monster);
-      return;
-    }
-
-    // Enemy turn
-    executeEnemyTurn();
-  }
-
-  function handlePlayerDefend() {
-    if (!gameState || !gameState.combat.active || !gameState.combat.monster) return;
-
-    gameState.combat.isPlayerDefending = true;
-    addLog(`You raise your defenses, bracing for the enemy's attack (+4 Defense).`, 'info');
-
-    executeEnemyTurn();
-  }
-
-  function handlePlayerUsePotionInCombat() {
-    if (!gameState || !gameState.combat.active || !gameState.combat.monster) return;
-
-    const c = gameState.character;
-    if (c.hp >= c.maxHp) {
-      addLog(`You are already at full HP (${c.hp}/${c.maxHp})! Potion not consumed.`, 'system');
-      return;
-    }
-
-    // Check available potion
-    let potionItem = gameState.inventory.find(i => i.item.type === 'potion' && i.quantity > 0);
-    if (!potionItem) {
-      addLog(`You have no potions left in your inventory!`, 'system');
-      return;
-    }
-
-    // Consume 1 potion
-    const healAmt = potionItem.item.healAmount || 20;
-    c.hp = Math.min(c.maxHp, c.hp + healAmt);
-    potionItem.quantity -= 1;
-    if (potionItem.quantity <= 0) {
-      gameState.inventory = gameState.inventory.filter(i => i.quantity > 0);
-    }
-
-    addLog(`You drank a ${potionItem.item.name} and recovered ${healAmt} HP! (${c.hp}/${c.maxHp})`, 'heal');
-
-    executeEnemyTurn();
-  }
-
-  function handlePlayerRun() {
-    if (!gameState || !gameState.combat.active || !gameState.combat.monster) return;
-
-    const monster = gameState.combat.monster;
-
-    if (monster.isBoss || gameState.dungeon.currentRoom >= 10) {
-      addLog(`You cannot run from the Dark Knight! You must fight!`, 'system');
-      return;
-    }
-
-    const c = gameState.character;
-    const dexMod = getStatModifier(c.stats.DEX);
-    const d20Roll = rollDie(20);
-    const escapeTotal = d20Roll + dexMod;
-    const dc = 11;
-
-    if (escapeTotal >= dc) {
-      addLog(`You rolled ${d20Roll} + ${dexMod} = ${escapeTotal}. You successfully escaped from the ${monster.name}!`, 'heal');
-      gameState.combat.active = false;
-      gameState.combat.monster = null;
-      gameState.dungeon.roomState.cleared = true;
-      gameState.dungeon.roomState.desc = `You fled from the ${monster.name}. The way forward is open.`;
-      render();
-    } else {
-      addLog(`You rolled ${d20Roll} + ${dexMod} = ${escapeTotal}. Escape attempt failed!`, 'miss');
-      executeEnemyTurn();
-    }
-  }
-
-  function executeEnemyTurn() {
-    if (!gameState || !gameState.combat.active || !gameState.combat.monster) return;
-
-    const monster = gameState.combat.monster;
-    if (monster.currentHp <= 0) return; // Dead monster doesn't attack
-
-    const playerDef = calculatePlayerDefense(gameState);
-    const d20Roll = rollDie(20);
-    const totalEnemyAtk = d20Roll + monster.attackBonus;
-
-    let isCrit = d20Roll === 20;
-    let isCritMiss = d20Roll === 1;
-
-    if (isCritMiss) {
-      addLog(`${monster.name} rolled ${d20Roll} + ${monster.attackBonus} = ${totalEnemyAtk}. Critical miss!`, 'miss');
-    } else if (isCrit) {
-      const dmgRes = rollDiceNotation(monster.damageDice);
-      const maxDiceVal = parseInt(monster.damageDice.split('d')[1] || '6', 10);
-      const damage = maxDiceVal + dmgRes.total;
-
-      gameState.character.hp = Math.max(0, gameState.character.hp - damage);
-      addLog(`${monster.name} NATURAL 20! Critical Hit! ${monster.name} deals ${damage} damage to you!`, 'enemy-crit');
-    } else if (totalEnemyAtk >= playerDef) {
-      const dmgRes = rollDiceNotation(monster.damageDice);
-      const damage = Math.max(1, dmgRes.total);
-
-      gameState.character.hp = Math.max(0, gameState.character.hp - damage);
-      addLog(`${monster.name} rolled ${d20Roll} + ${monster.attackBonus} = ${totalEnemyAtk} vs Def ${playerDef}. Hit! You take ${damage} damage.`, 'enemy-hit');
-    } else {
-      addLog(`${monster.name} rolled ${d20Roll} + ${monster.attackBonus} = ${totalEnemyAtk} vs Def ${playerDef}. Miss!`, 'miss');
-    }
-
-    // Reset defend state after enemy's turn
-    gameState.combat.isPlayerDefending = false;
-
-    // Check player death
-    if (gameState.character.hp <= 0) {
-      handlePlayerDefeated();
-      return;
-    }
-
-    render();
-  }
-
-  function handleMonsterDefeated(monster) {
-    addLog(`VICTORY! You defeated the ${monster.name}!`, 'player-crit');
-
-    const c = gameState.character;
-    c.monstersDefeated += 1;
-    c.gold += monster.goldReward;
-    addLog(`Earned ${monster.xpReward} XP and ${monster.goldReward} Gold!`, 'loot');
-
-    gameState.combat.active = false;
-    gameState.combat.monster = null;
-    gameState.dungeon.roomState.cleared = true;
-
-    // Award XP and check level up
-    awardXp(monster.xpReward);
-
-    if (monster.isBoss || gameState.dungeon.currentRoom >= 10) {
-      handleGameVictory();
-    } else {
-      render();
-    }
-  }
-
-  function awardXp(amount) {
-    if (amount <= 0) return;
-    const c = gameState.character;
-    c.xp += amount;
-
-    let requiredXp = getRequiredXpForLevel(c.level);
-    let leveledUp = false;
-
-    while (c.xp >= requiredXp) {
-      c.level += 1;
-      const cls = CLASSES[c.className] || CLASSES.Fighter;
-      const hpInc = cls.hpPerLevel + getStatModifier(c.stats.CON);
-      c.maxHp += hpInc;
-      c.hp = c.maxHp; // Restore HP on level up
-
-      // Boost primary stat and CON
-      c.stats[cls.primaryStat] += 1;
-      c.stats.CON += 1;
-
-      addLog(`LEVEL UP! You are now Level ${c.level}! Max HP increased by +${hpInc}. HP fully restored!`, 'levelup');
-      leveledUp = true;
-
-      requiredXp = getRequiredXpForLevel(c.level);
-    }
-
-    if (leveledUp) {
-      showToast(`Level Up! You reached Level ${c.level}!`);
-    }
-  }
-
-  function handlePlayerDefeated() {
-    addLog(`Your hero has fallen in battle...`, 'enemy-crit');
-    gameState.combat.active = false;
-    render();
-
-    // Show Game Over Modal
-    const modal = document.getElementById('gameover-modal');
-    const statsList = document.getElementById('gameover-stats-list');
-    if (modal && statsList) {
-      const c = gameState.character;
-      statsList.innerHTML = `
-        <li><span>Name:</span> <strong>${escapeHtml(c.name)}</strong></li>
-        <li><span>Class & Race:</span> <strong>${escapeHtml(c.raceName)} ${escapeHtml(c.className)}</strong></li>
-        <li><span>Final Level:</span> <strong>${c.level}</strong></li>
-        <li><span>Total XP:</span> <strong>${c.xp}</strong></li>
-        <li><span>Gold Collected:</span> <strong>${c.gold}</strong></li>
-        <li><span>Monsters Defeated:</span> <strong>${c.monstersDefeated}</strong></li>
-        <li><span>Dungeon Reached:</span> <strong>Room ${gameState.dungeon.currentRoom} / 10</strong></li>
-      `;
-      modal.classList.remove('hidden');
-    }
-  }
-
-  function handleGameVictory() {
-    render();
-    const modal = document.getElementById('victory-modal');
-    const statsList = document.getElementById('victory-stats-list');
-    if (modal && statsList) {
-      const c = gameState.character;
-      statsList.innerHTML = `
-        <li><span>Name:</span> <strong>${escapeHtml(c.name)}</strong></li>
-        <li><span>Class & Race:</span> <strong>${escapeHtml(c.raceName)} ${escapeHtml(c.className)}</strong></li>
-        <li><span>Final Level:</span> <strong>${c.level}</strong></li>
-        <li><span>Total XP:</span> <strong>${c.xp}</strong></li>
-        <li><span>Gold Remaining:</span> <strong>${c.gold}</strong></li>
-        <li><span>Monsters Defeated:</span> <strong>${c.monstersDefeated}</strong></li>
-      `;
-      modal.classList.remove('hidden');
-    }
-  }
-
-  // --- ROOM CONTROLLER ---
-  function proceedToNextRoom() {
-    if (!gameState) return;
-
-    // If room is not cleared, evaluate event
-    const currentRoomState = gameState.dungeon.roomState;
-    if (currentRoomState && !currentRoomState.cleared) {
-      if (currentRoomState.type === 'monster') {
-        startCombat(currentRoomState.monster);
-        return;
-      } else if (currentRoomState.type === 'treasure') {
-        const goldGain = rollDie(20) + 10;
-        gameState.character.gold += goldGain;
-        addLog(`You open the chest and find ${goldGain} Gold!`, 'loot');
-
-        // Chance for health potion
-        if (Math.random() < 0.6) {
-          addItemToInventory(ITEMS.potion_health, 1);
-          addLog(`You also found a Health Potion!`, 'loot');
-        }
-
-        currentRoomState.cleared = true;
-        render();
-        return;
-      } else if (currentRoomState.type === 'trap') {
-        const trapDmg = rollDie(6) + 2;
-        gameState.character.hp = Math.max(1, gameState.character.hp - trapDmg);
-        addLog(`A poisonous dart hits you for ${trapDmg} damage! (HP: ${gameState.character.hp}/${gameState.character.maxHp})`, 'enemy-hit');
-
-        currentRoomState.cleared = true;
-        render();
-        return;
-      } else if (currentRoomState.type === 'shrine') {
-        const healAmt = Math.floor(gameState.character.maxHp * 0.5);
-        gameState.character.hp = Math.min(gameState.character.maxHp, gameState.character.hp + healAmt);
-        addLog(`The holy shrine heals you for ${healAmt} HP!`, 'heal');
-
-        currentRoomState.cleared = true;
-        render();
-        return;
-      } else if (currentRoomState.type === 'empty') {
-        addLog(`You search the empty room but find nothing of interest.`, 'info');
-        currentRoomState.cleared = true;
-        render();
-        return;
-      }
-    }
-
-    // Move to next room if cleared
-    if (gameState.dungeon.currentRoom < gameState.dungeon.totalRooms) {
-      gameState.dungeon.currentRoom += 1;
-      gameState.dungeon.roomState = generateRoomState(gameState.dungeon.currentRoom);
-      addLog(`Advanced to Room ${gameState.dungeon.currentRoom}.`, 'system');
-
-      // Auto-trigger monster if room event is monster
-      if (gameState.dungeon.roomState.type === 'monster') {
-        startCombat(gameState.dungeon.roomState.monster);
-      } else {
-        render();
-      }
-    }
-  }
-
-  // --- INVENTORY MANAGEMENT ---
-  function addItemToInventory(itemTemplate, qty = 1) {
-    if (!gameState) return;
-    const existing = gameState.inventory.find(i => i.item.id === itemTemplate.id);
-    if (existing) {
-      existing.quantity += qty;
-    } else {
-      gameState.inventory.push({ item: itemTemplate, quantity: qty });
-    }
-  }
-
-  function equipItem(itemId) {
-    if (!gameState) return;
-    const invSlot = gameState.inventory.find(i => i.item.id === itemId);
-    if (!invSlot) return;
-
-    const item = invSlot.item;
-    if (item.type === 'weapon') {
-      // Unequip current weapon if exists
-      if (gameState.equipment.weapon) {
-        addItemToInventory(gameState.equipment.weapon, 1);
-      }
-      gameState.equipment.weapon = item;
-    } else if (item.type === 'armor') {
-      if (gameState.equipment.armor) {
-        addItemToInventory(gameState.equipment.armor, 1);
-      }
-      gameState.equipment.armor = item;
-    } else {
-      return; // Cannot equip non-equippable item
-    }
-
-    // Decrease item quantity in inventory
-    invSlot.quantity -= 1;
-    if (invSlot.quantity <= 0) {
-      gameState.inventory = gameState.inventory.filter(i => i.quantity > 0);
-    }
-
-    addLog(`Equipped ${item.name}.`, 'system');
-    render();
-  }
-
-  function unequipItem(slotType) {
-    if (!gameState) return;
-    if (slotType === 'weapon' && gameState.equipment.weapon) {
-      addItemToInventory(gameState.equipment.weapon, 1);
-      addLog(`Unequipped ${gameState.equipment.weapon.name}.`, 'system');
-      gameState.equipment.weapon = null;
-    } else if (slotType === 'armor' && gameState.equipment.armor) {
-      addItemToInventory(gameState.equipment.armor, 1);
-      addLog(`Unequipped ${gameState.equipment.armor.name}.`, 'system');
-      gameState.equipment.armor = null;
-    }
-    render();
-  }
-
-  function useInventoryItem(itemId) {
-    if (!gameState) return;
-    const invSlot = gameState.inventory.find(i => i.item.id === itemId);
-    if (!invSlot) return;
-
-    const item = invSlot.item;
-
-    if (item.type === 'potion') {
-      const c = gameState.character;
-      if (c.hp >= c.maxHp) {
-        addLog(`You are already at full HP (${c.hp}/${c.maxHp})! Potion not consumed.`, 'system');
-        return;
-      }
-
-      const healAmt = item.healAmount || 20;
-      c.hp = Math.min(c.maxHp, c.hp + healAmt);
-      invSlot.quantity -= 1;
-      if (invSlot.quantity <= 0) {
-        gameState.inventory = gameState.inventory.filter(i => i.quantity > 0);
-      }
-
-      addLog(`You drank ${item.name} and recovered ${healAmt} HP! (${c.hp}/${c.maxHp})`, 'heal');
-
-      // If in combat, drinking potion from inventory triggers enemy turn
-      if (gameState.combat.active && gameState.combat.monster) {
-        executeEnemyTurn();
-      } else {
-        render();
-      }
-    } else if (item.type === 'weapon' || item.type === 'armor') {
-      equipItem(itemId);
-    }
-  }
-
-  // --- SAVE & LOAD SYSTEM ---
-  function saveGame() {
-    if (!gameState || !gameState.inGame) {
-      showToast('No active game to save!');
-      return;
-    }
-    try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify(gameState));
-      showToast('Game saved successfully!');
-      addLog('Game saved to local storage.', 'system');
-    } catch (err) {
-      console.error(err);
-      showToast('Error saving game!');
-    }
-  }
-
-  function loadGame() {
-    try {
-      const raw = localStorage.getItem(SAVE_KEY);
-      if (!raw) {
-        showToast('No saved game found.');
-        addLog('No saved game found in local storage.', 'system');
-        return;
-      }
-
-      const loadedState = JSON.parse(raw);
-
-      // Validate save data structure
-      if (!loadedState || !loadedState.character || !loadedState.character.name || typeof loadedState.character.hp !== 'number') {
-        showToast('Save data is corrupted!');
-        addLog('Corrupted save data detected.', 'system');
-        return;
-      }
-
-      // Ensure stats and safe fallbacks
-      loadedState.character.hp = Math.max(0, Math.min(loadedState.character.maxHp, loadedState.character.hp));
-      loadedState.character.xp = Math.max(0, loadedState.character.xp || 0);
-      loadedState.character.level = Math.max(1, loadedState.character.level || 1);
-      loadedState.character.gold = Math.max(0, loadedState.character.gold || 0);
-
-      gameState = loadedState;
-
-      // Ensure roomState exists
-      if (!gameState.dungeon.roomState) {
-        gameState.dungeon.roomState = generateRoomState(gameState.dungeon.currentRoom);
-      }
-
-      // Switch views
-      document.getElementById('creation-view').classList.add('hidden');
-      document.getElementById('game-view').classList.remove('hidden');
-
-      showToast('Game loaded successfully!');
-      addLog('Save game loaded.', 'system');
-      render();
-    } catch (err) {
-      console.error(err);
-      showToast('Failed to load save data!');
-    }
-  }
-
-  function startNewGame() {
-    // Hide modals
-    document.getElementById('victory-modal').classList.add('hidden');
-    document.getElementById('gameover-modal').classList.add('hidden');
-
-    // Switch to creation view
-    document.getElementById('game-view').classList.add('hidden');
-    document.getElementById('creation-view').classList.remove('hidden');
-
-    updateCreationPreview();
-  }
-
-  // --- UI RENDERING ---
-  function render() {
-    if (!gameState || !gameState.inGame) return;
-
-    const c = gameState.character;
-    const reqXp = getRequiredXpForLevel(c.level);
-
-    // Character Sheet
-    setText('display-char-name', c.name);
-    setText('display-level', c.level);
-    setText('display-race', c.raceName);
-    setText('display-class', c.className);
-
-    setText('display-hp-text', `${c.hp} / ${c.maxHp}`);
-    const hpPct = Math.max(0, Math.min(100, (c.hp / c.maxHp) * 100));
-    setBarWidth('display-hp-bar', `${hpPct}%`);
-
-    setText('display-xp-text', `${c.xp} / ${reqXp}`);
-    const xpPct = Math.max(0, Math.min(100, (c.xp / reqXp) * 100));
-    setBarWidth('display-xp-bar', `${xpPct}%`);
-
-    setText('display-attack', calculatePlayerAttack(gameState));
-    setText('display-defense', calculatePlayerDefense(gameState));
-    setText('display-gold', c.gold);
-
-    setText('display-str', c.stats.STR);
-    setText('display-dex', c.stats.DEX);
-    setText('display-con', c.stats.CON);
-    setText('display-int', c.stats.INT);
-    setText('display-wis', c.stats.WIS);
-    setText('display-cha', c.stats.CHA);
-
-    // Dungeon View
-    const dungeon = gameState.dungeon;
-    setText('room-badge', `Room ${dungeon.currentRoom} / ${dungeon.totalRooms}`);
-
-    const rState = dungeon.roomState;
-    if (rState) {
-      setText('room-title', rState.title);
-      setText('room-description', rState.desc);
-    }
-
-    // Monster & Combat Display
-    const monsterBox = document.getElementById('monster-box');
-    const combatControls = document.getElementById('combat-controls');
-    const nonCombatControls = document.getElementById('non-combat-controls');
-    const btnRoomAction = document.getElementById('btn-room-action');
-
-    if (gameState.combat.active && gameState.combat.monster) {
-      const m = gameState.combat.monster;
-      monsterBox.classList.remove('hidden');
-      setText('monster-name', m.name);
-      setText('monster-hp-text', `HP: ${m.currentHp}/${m.maxHp}`);
-      setText('monster-desc', m.desc);
-
-      const mHpPct = Math.max(0, Math.min(100, (m.currentHp / m.maxHp) * 100));
-      setBarWidth('monster-hp-bar', `${mHpPct}%`);
-
-      combatControls.classList.remove('hidden');
-      nonCombatControls.classList.add('hidden');
-
-      // Disable Run button if boss
-      const btnRun = document.getElementById('btn-run');
-      if (btnRun) {
-        btnRun.disabled = m.isBoss || dungeon.currentRoom >= 10;
-      }
-    } else {
-      monsterBox.classList.add('hidden');
-      combatControls.classList.add('hidden');
-      nonCombatControls.classList.remove('hidden');
-
-      if (rState) {
-        if (!rState.cleared) {
-          if (rState.type === 'monster') {
-            btnRoomAction.textContent = 'Engage Monster';
-          } else if (rState.type === 'treasure') {
-            btnRoomAction.textContent = 'Open Treasure Chest';
-          } else if (rState.type === 'trap') {
-            btnRoomAction.textContent = 'Trigger Trap';
-          } else if (rState.type === 'shrine') {
-            btnRoomAction.textContent = 'Pray at Shrine';
-          } else {
-            btnRoomAction.textContent = 'Search Room';
-          }
-        } else {
-          if (dungeon.currentRoom >= dungeon.totalRooms) {
-            btnRoomAction.textContent = 'Dungeon Cleared!';
-            btnRoomAction.disabled = true;
-          } else {
-            btnRoomAction.textContent = `Proceed to Room ${dungeon.currentRoom + 1}`;
-            btnRoomAction.disabled = false;
-          }
-        }
-      }
-    }
-
-    // Equipment Display
-    const weaponName = gameState.equipment.weapon ? gameState.equipment.weapon.name : 'None';
-    const armorName = gameState.equipment.armor ? gameState.equipment.armor.name : 'None';
-    setText('equipped-weapon-name', weaponName);
-    setText('equipped-armor-name', armorName);
-
-    toggleVisibility('btn-unequip-weapon', !!gameState.equipment.weapon);
-    toggleVisibility('btn-unequip-armor', !!gameState.equipment.armor);
-
-    // Inventory List Display
-    renderInventoryList();
-  }
-
-  function renderInventoryList() {
-    const listEl = document.getElementById('inventory-list');
-    if (!listEl) return;
-    listEl.innerHTML = '';
-
-    if (!gameState || !gameState.inventory || gameState.inventory.length === 0) {
-      listEl.innerHTML = '<p class="preview-desc">Inventory is empty.</p>';
-      return;
-    }
-
-    gameState.inventory.forEach(slot => {
-      const item = slot.item;
-      const row = document.createElement('div');
-      row.className = 'inventory-item';
-
-      let actionBtnHtml = '';
-      if (item.type === 'potion') {
-        actionBtnHtml = `<button class="btn btn-mini btn-potion-use" data-item-id="${item.id}">Use</button>`;
-      } else if (item.type === 'weapon' || item.type === 'armor') {
-        actionBtnHtml = `<button class="btn btn-mini btn-equip-item" data-item-id="${item.id}">Equip</button>`;
-      }
-
-      row.innerHTML = `
-        <div class="item-info">
-          <span class="item-name">${escapeHtml(item.name)}</span>
-          <span class="item-qty">${item.desc} (Qty: ${slot.quantity})</span>
-        </div>
-        <div class="item-actions">
-          ${actionBtnHtml}
-        </div>
-      `;
-      listEl.appendChild(row);
-    });
-
-    // Attach event listeners to inventory buttons
-    listEl.querySelectorAll('.btn-potion-use, .btn-equip-item').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const itemId = e.target.getAttribute('data-item-id');
-        useInventoryItem(itemId);
-      });
-    });
-  }
-
-  function renderLogEntry(entry) {
     const logContainer = document.getElementById('combat-log');
-    if (!logContainer) return;
-
-    const div = document.createElement('div');
-    div.className = `log-entry ${entry.type || 'info'}`;
-    div.textContent = `[${entry.timestamp}] ${entry.text}`;
-    logContainer.appendChild(div);
-
-    // Auto-scroll to bottom
-    logContainer.scrollTop = logContainer.scrollHeight;
+    if (logContainer) {
+      const div = document.createElement('div');
+      div.className = `log-entry ${type}`;
+      div.textContent = `[${entry.timestamp}] ${text}`;
+      logContainer.appendChild(div);
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
   }
 
-  // --- CHARACTER CREATION PREVIEW ---
+  function setText(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val !== undefined && val !== null ? val : '';
+  }
+
+  function setBarWidth(id, pctStr) {
+    const el = document.getElementById(id);
+    if (el) el.style.width = pctStr;
+  }
+
   function updateCreationPreview() {
-    const nameInput = document.getElementById('char-name');
     const classSelect = document.getElementById('char-class');
     const raceSelect = document.getElementById('char-race');
     const previewContainer = document.getElementById('creation-preview-stats');
@@ -1045,8 +55,8 @@
 
     if (!classSelect || !raceSelect || !previewContainer) return;
 
-    const cls = CLASSES[classSelect.value] || CLASSES.Fighter;
-    const race = RACES[raceSelect.value] || RACES.Human;
+    const cls = window.DOS.CLASSES[classSelect.value] || window.DOS.CLASSES.Fighter;
+    const race = window.DOS.RACES[raceSelect.value] || window.DOS.RACES.Human;
 
     const str = cls.baseStats.STR + race.bonuses.STR;
     const dex = cls.baseStats.DEX + race.bonuses.DEX;
@@ -1064,145 +74,596 @@
       <div>INT: ${int}</div>
       <div>WIS: ${wis}</div>
       <div>CHA: ${cha}</div>
-      <div style="grid-column: span 3; margin-top: 4px; color: #701313;">Starting HP: ${hp}</div>
+      <div style="grid-column: span 3; margin-top: 4px; color: #701313;">Starting HP: ${hp} | Skill: ${cls.signatureSkill}</div>
     `;
 
-    if (descEl) {
-      descEl.textContent = `${cls.desc} (${race.desc})`;
+    if (descEl) descEl.textContent = `${cls.desc} (${race.desc})`;
+  }
+
+  function render() {
+    if (!state || !state.inGame) return;
+
+    const c = state.character;
+    const reqXp = c.level * 100 + (c.level - 1) * 50;
+
+    // Character Sheet
+    setText('display-char-name', c.name);
+    setText('display-level', c.level);
+    setText('display-race', c.raceName);
+    setText('display-class', c.className);
+    setText('display-date', window.DOS.TimeSystem.getDateString(state));
+
+    setText('display-hp-text', `${c.hp} / ${c.maxHp}`);
+    setBarWidth('display-hp-bar', `${Math.max(0, Math.min(100, (c.hp / c.maxHp) * 100))}%`);
+
+    setText('display-xp-text', `${c.xp} / ${reqXp}`);
+    setBarWidth('display-xp-bar', `${Math.max(0, Math.min(100, (c.xp / reqXp) * 100))}%`);
+
+    setText('display-attack', window.DOS.CombatSystem.calculatePlayerAttack(state));
+    setText('display-defense', window.DOS.CombatSystem.calculatePlayerDefense(state));
+    setText('display-gold', c.gold);
+
+    setText('display-str', c.stats.STR);
+    setText('display-dex', c.stats.DEX);
+    setText('display-con', c.stats.CON);
+    setText('display-int', c.stats.INT);
+    setText('display-wis', c.stats.WIS);
+    setText('display-cha', c.stats.CHA);
+
+    // Check for Game Over or Victory Modals
+    if (c.hp <= 0) {
+      showGameOverModal();
     }
-  }
 
-  // --- HELPER UTILITIES ---
-  function setText(elementId, value) {
-    const el = document.getElementById(elementId);
-    if (el) el.textContent = value !== undefined && value !== null ? value : '';
-  }
+    // Map vs Dungeon Visibility
+    const mapContainer = document.getElementById('world-map-container');
+    const dungeonContainer = document.getElementById('dungeon-container');
+    const nonCombatControls = document.getElementById('non-combat-controls');
+    const combatControls = document.getElementById('combat-controls');
 
-  function setBarWidth(elementId, widthStr) {
-    const el = document.getElementById(elementId);
-    if (el) el.style.width = widthStr;
-  }
+    if (state.currentView === 'WORLD_MAP') {
+      mapContainer.classList.remove('hidden');
+      dungeonContainer.classList.add('hidden');
+      nonCombatControls.classList.add('hidden');
+      combatControls.classList.add('hidden');
 
-  function toggleVisibility(elementId, show) {
-    const el = document.getElementById(elementId);
-    if (el) {
-      if (show) el.classList.remove('hidden');
-      else el.classList.add('hidden');
+      // Update Fog & Render Canvas
+      if (mapSystem && world) {
+        mapSystem.updateFogOfWar(state, world.terrain);
+        mapSystem.render(state, world);
+      }
+
+      // Tile info
+      const tile = world.terrain.grid[state.playerPos.y * world.terrain.width + state.playerPos.x];
+      const locInfo = document.getElementById('map-location-info');
+      if (locInfo && tile) {
+        let nameStr = tile.biome.toUpperCase();
+        if (tile.locationId) {
+          const s = world.settlements.find(s => s.id === tile.locationId);
+          const d = world.dungeons.find(d => d.id === tile.locationId);
+          if (s) nameStr = `${s.name} (${s.typeName})`;
+          if (d) nameStr = `${d.name} [Danger: ${d.difficulty}/10]`;
+        }
+        locInfo.textContent = `Location: (${tile.x}, ${tile.y}) — ${nameStr}`;
+      }
+    } else if (state.currentView === 'DUNGEON') {
+      mapContainer.classList.add('hidden');
+      dungeonContainer.classList.remove('hidden');
+
+      const dState = state.dungeon;
+      if (dState && dState.rooms) {
+        const room = dState.rooms[dState.currentRoom - 1] || dState.roomState || {};
+        setText('room-title', room.title || 'Dungeon Chamber');
+        setText('room-badge', `Room ${dState.currentRoom} / ${dState.totalRooms}`);
+        setText('room-description', room.desc || 'A silent corridor echoing with ancient power.');
+
+        const btnRoomAction = document.getElementById('btn-room-action');
+        if (btnRoomAction) {
+          if (dState.currentRoom >= dState.totalRooms && !state.combat.active) {
+            btnRoomAction.textContent = 'Exit Dungeon';
+          } else {
+            btnRoomAction.textContent = 'Proceed to Next Room';
+          }
+        }
+      }
+
+      if (state.combat.active && state.combat.monster) {
+        const m = state.combat.monster;
+        document.getElementById('monster-box').classList.remove('hidden');
+        setText('monster-name', m.name);
+        setText('monster-hp-text', `HP: ${m.currentHp}/${m.maxHp}`);
+        setText('monster-desc', m.desc);
+        setBarWidth('monster-hp-bar', `${Math.max(0, Math.min(100, (m.currentHp / m.maxHp) * 100))}%`);
+
+        combatControls.classList.remove('hidden');
+        nonCombatControls.classList.add('hidden');
+      } else {
+        document.getElementById('monster-box').classList.add('hidden');
+        combatControls.classList.add('hidden');
+        nonCombatControls.classList.remove('hidden');
+      }
     }
+
+    // Equipment & Inventory Display
+    const weaponBtn = document.getElementById('btn-unequip-weapon');
+    const armorBtn = document.getElementById('btn-unequip-armor');
+
+    if (state.equipment.weapon) {
+      setText('equipped-weapon-name', state.equipment.weapon.name);
+      if (weaponBtn) weaponBtn.classList.remove('hidden');
+    } else {
+      setText('equipped-weapon-name', 'None');
+      if (weaponBtn) weaponBtn.classList.add('hidden');
+    }
+
+    if (state.equipment.shield) {
+      setText('equipped-armor-name', state.equipment.shield.name);
+      if (armorBtn) armorBtn.classList.remove('hidden');
+    } else {
+      setText('equipped-armor-name', 'None');
+      if (armorBtn) armorBtn.classList.add('hidden');
+    }
+
+    renderInventory();
   }
 
-  function escapeHtml(str) {
-    if (!str) return '';
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
+  function renderInventory() {
+    const listEl = document.getElementById('inventory-list');
+    if (!listEl) return;
+    listEl.innerHTML = '';
 
-  // --- EVENT ATTACHMENTS ---
-  function initEvents() {
-    // Character creation form inputs
-    const charClassSelect = document.getElementById('char-class');
-    const charRaceSelect = document.getElementById('char-race');
-    if (charClassSelect) charClassSelect.addEventListener('change', updateCreationPreview);
-    if (charRaceSelect) charRaceSelect.addEventListener('change', updateCreationPreview);
+    if (!state.inventory || state.inventory.length === 0) {
+      listEl.innerHTML = '<p class="preview-desc">Inventory is empty.</p>';
+      return;
+    }
 
-    // Enter Dungeon / Start Adventure button
-    const btnStart = document.getElementById('btn-start-adventure');
-    if (btnStart) {
-      btnStart.addEventListener('click', () => {
-        const nameInput = document.getElementById('char-name');
-        const heroName = nameInput ? nameInput.value : 'Hero';
+    state.inventory.forEach((slot, idx) => {
+      const item = slot.item;
+      const row = document.createElement('div');
+      row.className = 'inventory-item';
+      row.style.display = 'flex';
+      row.style.justifyContent = 'space-between';
+      row.style.alignItems = 'center';
+      row.style.marginBottom = '6px';
 
-        if (!heroName.trim()) {
-          showToast('Please enter a hero name!');
-          nameInput.focus();
-          return;
-        }
+      let actionBtnHtml = '';
+      if (item.type === 'potion') {
+        actionBtnHtml = `<button class="btn btn-mini btn-use-item" data-index="${idx}">Use</button>`;
+      } else if (item.type === 'weapon' || item.type === 'shield') {
+        actionBtnHtml = `<button class="btn btn-mini btn-equip-item" data-index="${idx}">Equip</button>`;
+      }
 
-        const className = charClassSelect ? charClassSelect.value : 'Fighter';
-        const raceName = charRaceSelect ? charRaceSelect.value : 'Human';
+      row.innerHTML = `
+        <div class="item-info">
+          <span class="item-name" style="font-weight:bold;">${item.name} x${slot.quantity}</span>
+          <div class="item-qty" style="font-size:0.85rem; color:#555;">${item.desc}</div>
+        </div>
+        <div>${actionBtnHtml}</div>
+      `;
 
-        gameState = createInitialGameState(heroName, className, raceName);
-        gameState.dungeon.roomState = generateRoomState(1);
+      listEl.appendChild(row);
+    });
 
-        document.getElementById('creation-view').classList.add('hidden');
-        document.getElementById('game-view').classList.remove('hidden');
-
-        // Clear logs
-        const logContainer = document.getElementById('combat-log');
-        if (logContainer) logContainer.innerHTML = '';
-
-        addLog(`Welcome to Dungeon of Shadows, ${gameState.character.name} the ${raceName} ${className}!`, 'system');
-
-        // Auto-trigger Room 1 event if monster
-        if (gameState.dungeon.roomState.type === 'monster') {
-          startCombat(gameState.dungeon.roomState.monster);
-        } else {
-          render();
-        }
+    // Attach event handlers for inventory item buttons
+    listEl.querySelectorAll('.btn-use-item').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const index = parseInt(e.target.getAttribute('data-index'), 10);
+        useInventoryPotion(index);
       });
+    });
+
+    listEl.querySelectorAll('.btn-equip-item').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const index = parseInt(e.target.getAttribute('data-index'), 10);
+        equipInventoryItem(index);
+      });
+    });
+  }
+
+  function useInventoryPotion(slotIndex) {
+    if (!state || !state.inventory[slotIndex]) return;
+    const slot = state.inventory[slotIndex];
+    const item = slot.item;
+
+    if (item.type !== 'potion') return;
+
+    if (state.character.hp >= state.character.maxHp) {
+      addLog('You are already at full HP!', 'info');
+      showToast('Already at full HP!');
+      return;
     }
 
-    // Room Action button
-    const btnRoomAction = document.getElementById('btn-room-action');
-    if (btnRoomAction) {
-      btnRoomAction.addEventListener('click', proceedToNextRoom);
+    const healAmt = item.healAmount || 15;
+    const oldHp = state.character.hp;
+    state.character.hp = Math.min(state.character.maxHp, state.character.hp + healAmt);
+    const recovered = state.character.hp - oldHp;
+
+    slot.quantity -= 1;
+    if (slot.quantity <= 0) {
+      state.inventory.splice(slotIndex, 1);
     }
+
+    addLog(`Used ${item.name} and recovered ${recovered} HP!`, 'heal');
+    render();
+  }
+
+  function equipInventoryItem(slotIndex) {
+    if (!state || !state.inventory[slotIndex]) return;
+    const slot = state.inventory[slotIndex];
+    const item = slot.item;
+
+    if (item.type === 'weapon') {
+      if (state.equipment.weapon) {
+        // Return old weapon to inventory
+        const existingSlot = state.inventory.find(s => s.item.id === state.equipment.weapon.id);
+        if (existingSlot) existingSlot.quantity += 1;
+        else state.inventory.push({ item: state.equipment.weapon, quantity: 1 });
+      }
+      state.equipment.weapon = item;
+      slot.quantity -= 1;
+      if (slot.quantity <= 0) state.inventory.splice(slotIndex, 1);
+      addLog(`Equipped weapon: ${item.name}!`, 'system');
+    } else if (item.type === 'shield') {
+      if (state.equipment.shield) {
+        const existingSlot = state.inventory.find(s => s.item.id === state.equipment.shield.id);
+        if (existingSlot) existingSlot.quantity += 1;
+        else state.inventory.push({ item: state.equipment.shield, quantity: 1 });
+      }
+      state.equipment.shield = item;
+      slot.quantity -= 1;
+      if (slot.quantity <= 0) state.inventory.splice(slotIndex, 1);
+      addLog(`Equipped armor/shield: ${item.name}!`, 'system');
+    }
+
+    render();
+  }
+
+  function showGameOverModal() {
+    const modal = document.getElementById('gameover-modal');
+    if (!modal) return;
+    const statsList = document.getElementById('gameover-stats-list');
+    if (statsList && state) {
+      const c = state.character;
+      statsList.innerHTML = `
+        <li><strong>Name:</strong> ${c.name}</li>
+        <li><strong>Class & Race:</strong> Level ${c.level} ${c.raceName} ${c.className}</li>
+        <li><strong>Monsters Defeated:</strong> ${c.monstersDefeated}</li>
+        <li><strong>Gold Earned:</strong> ${c.gold}</li>
+      `;
+    }
+    modal.classList.remove('hidden');
+  }
+
+  function showVictoryModal() {
+    const modal = document.getElementById('victory-modal');
+    if (!modal) return;
+    const statsList = document.getElementById('victory-stats-list');
+    if (statsList && state) {
+      const c = state.character;
+      statsList.innerHTML = `
+        <li><strong>Hero Name:</strong> ${c.name}</li>
+        <li><strong>Level Reached:</strong> ${c.level} (${c.xp} XP)</li>
+        <li><strong>Class & Race:</strong> ${c.raceName} ${c.className}</li>
+        <li><strong>Monsters Defeated:</strong> ${c.monstersDefeated}</li>
+        <li><strong>Total Gold accumulated:</strong> ${c.gold}</li>
+      `;
+    }
+    modal.classList.remove('hidden');
+  }
+
+  function handleMovePlayer(dx, dy) {
+    if (!state || state.currentView !== 'WORLD_MAP') return;
+
+    const nx = state.playerPos.x + dx;
+    const ny = state.playerPos.y + dy;
+
+    if (nx < 0 || nx >= world.terrain.width || ny < 0 || ny >= world.terrain.height) return;
+
+    const tile = world.terrain.grid[ny * world.terrain.width + nx];
+    if (!tile.biome || tile.biome === 'ocean') {
+      showToast('Cannot cross deep ocean waters!');
+      return;
+    }
+
+    state.playerPos.x = nx;
+    state.playerPos.y = ny;
+
+    // Advance time on movement
+    window.DOS.TimeSystem.advanceTime(state, 1);
+
+    // Travel Random Event
+    if (eventGen) {
+      const ev = eventGen.checkTravelEvent(state, tile);
+      if (ev) {
+        addLog(`EVENT: ${ev.title} — ${ev.desc}`, 'system');
+        const checkRes = eventGen.performSkillCheck(state, ev.checkSkill, ev.dc);
+        addLog(checkRes.logText, checkRes.isSuccess ? 'heal' : 'enemy-hit');
+
+        if (checkRes.isSuccess && ev.rewardGold) {
+          state.character.gold += ev.rewardGold;
+          addLog(`Gained +${ev.rewardGold} Gold!`, 'loot');
+        } else if (!checkRes.isSuccess && ev.triggerMonster) {
+          const monsterTpl = window.DOS.MONSTER_CATALOG[ev.triggerMonster];
+          if (monsterTpl) {
+            state.currentView = 'DUNGEON';
+            state.combat.active = true;
+            state.combat.monster = JSON.parse(JSON.stringify(monsterTpl));
+            state.combat.monster.currentHp = state.combat.monster.maxHp;
+            addLog(`Combat engaged with ${state.combat.monster.name}!`, 'enemy-crit');
+          }
+        }
+      }
+    }
+
+    // Check if stepped on a location
+    if (tile.locationId) {
+      const s = world.settlements.find(s => s.id === tile.locationId);
+      const d = world.dungeons.find(d => d.id === tile.locationId);
+      if (s) {
+        addLog(`Arrived at ${s.name} (${s.typeName}). Rested and healed fully!`, 'heal');
+        state.character.hp = state.character.maxHp;
+      } else if (d) {
+        addLog(`Entered ${d.name} [Difficulty ${d.difficulty}/10].`, 'system');
+        state.currentView = 'DUNGEON';
+        // Generate rooms
+        const rooms = dungeonGen.generateRoomsForDungeon(d, state);
+        state.dungeon = {
+          currentRoom: 1,
+          totalRooms: d.totalRooms,
+          rooms: rooms,
+          roomState: rooms[0]
+        };
+        if (rooms[0].type === 'monster' && rooms[0].monster) {
+          state.combat.active = true;
+          state.combat.monster = JSON.parse(JSON.stringify(rooms[0].monster));
+          state.combat.monster.currentHp = state.combat.monster.maxHp;
+        }
+      }
+    }
+
+    render();
+  }
+
+  function initEvents() {
+    document.getElementById('char-class').addEventListener('change', updateCreationPreview);
+    document.getElementById('char-race').addEventListener('change', updateCreationPreview);
+
+    document.getElementById('btn-start-adventure').addEventListener('click', () => {
+      const nameInput = document.getElementById('char-name');
+      const seedInput = document.getElementById('world-seed');
+      const heroName = nameInput ? nameInput.value : 'Hero';
+      const customSeed = seedInput ? seedInput.value : null;
+
+      const className = document.getElementById('char-class').value;
+      const raceName = document.getElementById('char-race').value;
+
+      state = window.DOS.createInitialState(heroName, className, raceName, customSeed);
+
+      // Generate World
+      const worldGen = new window.DOS.WorldGenerator(state.worldSeed);
+      world = worldGen.generate();
+      eventGen = new window.DOS.EventGenerator(state.worldSeed);
+      dungeonGen = new window.DOS.DungeonGenerator(state.worldSeed);
+
+      // Add dungeons to world
+      world.dungeons = dungeonGen.generateWorldDungeons(world.terrain, world.settlements);
+
+      state.playerPos = { x: world.startingPos.x, y: world.startingPos.y };
+
+      const canvas = document.getElementById('world-map-canvas');
+      mapSystem = new window.DOS.MapSystem(canvas);
+
+      document.getElementById('creation-view').classList.add('hidden');
+      document.getElementById('game-view').classList.remove('hidden');
+      document.getElementById('view-nav-bar').classList.remove('hidden');
+
+      addLog(`Welcome to the world of Dungeon of Shadows, ${state.character.name}!`, 'system');
+      addLog(`World Seed: ${state.worldSeed}`, 'system');
+
+      window.DOS.DebugSystem.init(state, render);
+
+      render();
+    });
+
+    // WASD / Arrow Key movement
+    window.addEventListener('keydown', (e) => {
+      if (!state || state.currentView !== 'WORLD_MAP') return;
+      if (['ArrowUp', 'KeyW'].includes(e.code)) handleMovePlayer(0, -1);
+      if (['ArrowDown', 'KeyS'].includes(e.code)) handleMovePlayer(0, 1);
+      if (['ArrowLeft', 'KeyA'].includes(e.code)) handleMovePlayer(-1, 0);
+      if (['ArrowRight', 'KeyD'].includes(e.code)) handleMovePlayer(1, 0);
+    });
+
+    // Navigation buttons
+    document.getElementById('nav-btn-world').addEventListener('click', () => {
+      if (state) { state.currentView = 'WORLD_MAP'; render(); }
+    });
+    document.getElementById('nav-btn-dungeon').addEventListener('click', () => {
+      if (state) { state.currentView = 'DUNGEON'; render(); }
+    });
+
+    // Dungeon room progression button
+    document.getElementById('btn-room-action').addEventListener('click', () => {
+      if (!state || state.currentView !== 'DUNGEON') return;
+      if (state.combat.active) return;
+
+      const dState = state.dungeon;
+      if (!dState || !dState.rooms) {
+        state.currentView = 'WORLD_MAP';
+        render();
+        return;
+      }
+
+      if (dState.currentRoom >= dState.totalRooms) {
+        addLog('Leaving dungeon and returning to world map.', 'system');
+        state.currentView = 'WORLD_MAP';
+        render();
+        return;
+      }
+
+      dState.currentRoom += 1;
+      const room = dState.rooms[dState.currentRoom - 1];
+      dState.roomState = room;
+
+      addLog(`Advanced to Room ${dState.currentRoom}: ${room.title}`, 'system');
+
+      if (room.type === 'monster' && room.monster) {
+        state.combat.active = true;
+        state.combat.monster = JSON.parse(JSON.stringify(room.monster));
+        state.combat.monster.currentHp = state.combat.monster.maxHp;
+        addLog(`Encountered ${room.monster.name}! ${room.monster.desc}`, 'enemy-crit');
+      } else if (room.type === 'treasure') {
+        const goldVal = room.gold || (15 + window.DOS.rollDie(20));
+        state.character.gold += goldVal;
+        addLog(`Treasure found! Claimed ${goldVal} Gold!`, 'loot');
+      } else if (room.type === 'trap') {
+        const trapDmg = room.damage || (3 + window.DOS.rollDie(6));
+        state.character.hp = Math.max(0, state.character.hp - trapDmg);
+        addLog(`TRAP TRIGGERED! You take ${trapDmg} damage!`, 'enemy-hit');
+      } else if (room.type === 'healing') {
+        const oldHp = state.character.hp;
+        state.character.hp = state.character.maxHp;
+        addLog(`Healing Shrine! HP restored from ${oldHp} to ${state.character.maxHp}!`, 'heal');
+      }
+
+      render();
+    });
 
     // Combat buttons
-    const btnAttack = document.getElementById('btn-attack');
-    if (btnAttack) btnAttack.addEventListener('click', handlePlayerAttack);
+    document.getElementById('btn-attack').addEventListener('click', () => {
+      window.DOS.CombatSystem.playerAttack(state, addLog);
+      render();
+    });
+    document.getElementById('btn-skill').addEventListener('click', () => {
+      window.DOS.CombatSystem.playerSkill(state, addLog);
+      render();
+    });
+    document.getElementById('btn-defend').addEventListener('click', () => {
+      if (!state || !state.combat.active) return;
+      state.combat.isPlayerDefending = true;
+      addLog('You take a defensive posture (+4 Defense until next turn).', 'system');
+      window.DOS.CombatSystem.executeEnemyTurn(state, addLog);
+      render();
+    });
+    document.getElementById('btn-combat-potion').addEventListener('click', () => {
+      if (!state || !state.combat.active) return;
+      const potIdx = state.inventory.findIndex(s => s.item.type === 'potion');
+      if (potIdx < 0) {
+        addLog('No health potions available in inventory!', 'miss');
+        showToast('No potions available!');
+        return;
+      }
+      useInventoryPotion(potIdx);
+      window.DOS.CombatSystem.executeEnemyTurn(state, addLog);
+      render();
+    });
+    document.getElementById('btn-run').addEventListener('click', () => {
+      if (!state || !state.combat.active) return;
+      if (state.combat.monster && state.combat.monster.isBoss) {
+        addLog('You cannot run from a final boss!', 'enemy-crit');
+        showToast('Cannot run from boss!');
+        return;
+      }
+      const runRoll = window.DOS.rollDie(20);
+      if (runRoll >= 10) {
+        addLog(`Escape attempt successful (Rolled ${runRoll} >= 10)! Fled from battle.`, 'heal');
+        state.combat.active = false;
+        state.combat.monster = null;
+      } else {
+        addLog(`Escape failed (Rolled ${runRoll} < 10)! Enemy attacks!`, 'enemy-hit');
+        window.DOS.CombatSystem.executeEnemyTurn(state, addLog);
+      }
+      render();
+    });
 
-    const btnDefend = document.getElementById('btn-defend');
-    if (btnDefend) btnDefend.addEventListener('click', handlePlayerDefend);
+    // Equipment Unequip Buttons
+    document.getElementById('btn-unequip-weapon').addEventListener('click', () => {
+      if (!state || !state.equipment.weapon) return;
+      const wp = state.equipment.weapon;
+      const existingSlot = state.inventory.find(s => s.item.id === wp.id);
+      if (existingSlot) existingSlot.quantity += 1;
+      else state.inventory.push({ item: wp, quantity: 1 });
+      state.equipment.weapon = null;
+      addLog(`Unequipped weapon: ${wp.name}`, 'system');
+      render();
+    });
 
-    const btnCombatPotion = document.getElementById('btn-combat-potion');
-    if (btnCombatPotion) btnCombatPotion.addEventListener('click', handlePlayerUsePotionInCombat);
+    document.getElementById('btn-unequip-armor').addEventListener('click', () => {
+      if (!state || !state.equipment.shield) return;
+      const sh = state.equipment.shield;
+      const existingSlot = state.inventory.find(s => s.item.id === sh.id);
+      if (existingSlot) existingSlot.quantity += 1;
+      else state.inventory.push({ item: sh, quantity: 1 });
+      state.equipment.shield = null;
+      addLog(`Unequipped armor: ${sh.name}`, 'system');
+      render();
+    });
 
-    const btnRun = document.getElementById('btn-run');
-    if (btnRun) btnRun.addEventListener('click', handlePlayerRun);
+    // Log Clear & New Game Buttons
+    document.getElementById('btn-clear-log').addEventListener('click', () => {
+      const logContainer = document.getElementById('combat-log');
+      if (logContainer) logContainer.innerHTML = '';
+      if (state) state.logs = [];
+    });
 
-    // Unequip buttons
-    const btnUnequipWeapon = document.getElementById('btn-unequip-weapon');
-    if (btnUnequipWeapon) btnUnequipWeapon.addEventListener('click', () => unequipItem('weapon'));
+    document.getElementById('btn-new-game').addEventListener('click', () => {
+      if (confirm('Start a new game? Any unsaved progress will be lost.')) {
+        state = null;
+        document.getElementById('game-view').classList.add('hidden');
+        document.getElementById('view-nav-bar').classList.add('hidden');
+        document.getElementById('creation-view').classList.remove('hidden');
+        document.getElementById('gameover-modal').classList.add('hidden');
+        document.getElementById('victory-modal').classList.add('hidden');
+      }
+    });
 
-    const btnUnequipArmor = document.getElementById('btn-unequip-armor');
-    if (btnUnequipArmor) btnUnequipArmor.addEventListener('click', () => unequipItem('armor'));
+    // Modal Buttons
+    document.getElementById('btn-victory-continue').addEventListener('click', () => {
+      document.getElementById('victory-modal').classList.add('hidden');
+      if (state) { state.currentView = 'WORLD_MAP'; render(); }
+    });
+    document.getElementById('btn-victory-restart').addEventListener('click', () => {
+      document.getElementById('victory-modal').classList.add('hidden');
+      state = null;
+      document.getElementById('game-view').classList.add('hidden');
+      document.getElementById('view-nav-bar').classList.add('hidden');
+      document.getElementById('creation-view').classList.remove('hidden');
+    });
+    document.getElementById('btn-gameover-restart').addEventListener('click', () => {
+      document.getElementById('gameover-modal').classList.add('hidden');
+      state = null;
+      document.getElementById('game-view').classList.add('hidden');
+      document.getElementById('view-nav-bar').classList.add('hidden');
+      document.getElementById('creation-view').classList.remove('hidden');
+    });
 
     // Header buttons
-    const btnSave = document.getElementById('btn-save-game');
-    if (btnSave) btnSave.addEventListener('click', saveGame);
+    document.getElementById('btn-save-game').addEventListener('click', () => {
+      if (window.DOS.saveGame(state)) showToast('Game saved!');
+    });
+    document.getElementById('btn-load-game').addEventListener('click', () => {
+      const loaded = window.DOS.loadGame();
+      if (loaded) {
+        state = loaded;
+        const worldGen = new window.DOS.WorldGenerator(state.worldSeed);
+        world = worldGen.generate();
+        dungeonGen = new window.DOS.DungeonGenerator(state.worldSeed);
+        world.dungeons = dungeonGen.generateWorldDungeons(world.terrain, world.settlements);
 
-    const btnLoad = document.getElementById('btn-load-game');
-    if (btnLoad) btnLoad.addEventListener('click', loadGame);
+        mapSystem = new window.DOS.MapSystem(document.getElementById('world-map-canvas'));
+        document.getElementById('creation-view').classList.add('hidden');
+        document.getElementById('game-view').classList.remove('hidden');
+        document.getElementById('view-nav-bar').classList.remove('hidden');
+        showToast('Game loaded!');
+        render();
+      } else {
+        showToast('No valid save found.');
+      }
+    });
 
-    const btnNewGame = document.getElementById('btn-new-game');
-    if (btnNewGame) btnNewGame.addEventListener('click', startNewGame);
-
-    // Clear log
-    const btnClearLog = document.getElementById('btn-clear-log');
-    if (btnClearLog) {
-      btnClearLog.addEventListener('click', () => {
-        const logContainer = document.getElementById('combat-log');
-        if (logContainer) logContainer.innerHTML = '';
-        if (gameState) gameState.logs = [];
-      });
-    }
-
-    // Modal restart buttons
-    const btnVictoryRestart = document.getElementById('btn-victory-restart');
-    if (btnVictoryRestart) btnVictoryRestart.addEventListener('click', startNewGame);
-
-    const btnGameOverRestart = document.getElementById('btn-gameover-restart');
-    if (btnGameOverRestart) btnGameOverRestart.addEventListener('click', startNewGame);
-
-    // Initial preview setup
     updateCreationPreview();
   }
 
-  // Initialize on DOM load
   document.addEventListener('DOMContentLoaded', initEvents);
 
 })();

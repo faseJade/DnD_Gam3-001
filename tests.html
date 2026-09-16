@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dungeon of Shadows - In-Browser Test Runner</title>
+  <style>
+    body { font-family: monospace; background: #121016; color: #f5eedc; padding: 20px; }
+    h1 { color: #c59b27; }
+    .pass { color: #81c784; }
+    .fail { color: #e57373; font-weight: bold; }
+    .test-case { margin: 6px 0; padding: 6px; background: #221c2b; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Dungeon of Shadows Test Runner</h1>
+  <div id="test-results">Running tests...</div>
+
+  <!-- Load scripts in order -->
+  <script src="js/rng.js"></script>
+  <script src="js/dice.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/save.js"></script>
+  <script src="js/time.js"></script>
+  <script src="js/terrain.js"></script>
+  <script src="js/towns.js"></script>
+  <script src="js/roads.js"></script>
+  <script src="js/npcs.js"></script>
+  <script src="js/monsters.js"></script>
+  <script src="js/loot.js"></script>
+  <script src="js/dungeons.js"></script>
+  <script src="js/quests.js"></script>
+  <script src="js/events.js"></script>
+  <script src="js/events_world.js"></script>
+  <script src="js/reputation.js"></script>
+  <script src="js/combat.js"></script>
+  <script src="js/narrator.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/world.js"></script>
+  <script src="tests/tests.js"></script>
+</body>
+</html>

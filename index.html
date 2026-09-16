@@ -5,6 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dungeon of Shadows - Fantasy RPG</title>
   <link rel="stylesheet" href="style.css">
+
+  <!-- Core Modules -->
+  <script src="js/rng.js"></script>
+  <script src="js/dice.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/save.js"></script>
+  <script src="js/time.js"></script>
+  <script src="js/terrain.js"></script>
+  <script src="js/towns.js"></script>
+  <script src="js/roads.js"></script>
+  <script src="js/npcs.js"></script>
+  <script src="js/monsters.js"></script>
+  <script src="js/loot.js"></script>
+  <script src="js/dungeons.js"></script>
+  <script src="js/quests.js"></script>
+  <script src="js/events.js"></script>
+  <script src="js/events_world.js"></script>
+  <script src="js/reputation.js"></script>
+  <script src="js/combat.js"></script>
+  <script src="js/narrator.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/world.js"></script>
+  <script src="js/debug.js"></script>
 </head>
 <body>
   <div class="app-container">
@@ -12,7 +36,7 @@
     <header class="game-header">
       <div class="header-titles">
         <h1 class="game-title">DUNGEON OF SHADOWS</h1>
-        <p class="game-subtitle">A Dark Medieval Fantasy Text RPG</p>
+        <p class="game-subtitle">A Procedural Open-World Fantasy RPG</p>
       </div>
       <div class="header-actions">
         <button id="btn-save-game" class="btn btn-secondary" title="Save current progress">Save Game</button>
@@ -21,6 +45,14 @@
       </div>
     </header>
 
+    <!-- Navigation View Selector -->
+    <nav id="view-nav-bar" class="nav-bar hidden">
+      <button id="nav-btn-world" class="btn btn-secondary active">World Map</button>
+      <button id="nav-btn-dungeon" class="btn btn-secondary">Dungeon Area</button>
+      <button id="nav-btn-inventory" class="btn btn-secondary">Inventory</button>
+      <button id="nav-btn-quests" class="btn btn-secondary">Quests</button>
+    </nav>
+
     <!-- Character Creation View -->
     <main id="creation-view" class="view-panel">
       <div class="parchment-card creation-card">
@@ -28,16 +60,19 @@
         <form id="character-creation-form" onsubmit="return false;">
           <div class="form-group">
             <label for="char-name">Hero Name</label>
-            <input type="text" id="char-name" name="char-name" maxlength="20" placeholder="e.g., Eldrin the Brave" required autocomplete="off">
+            <input type="text" id="char-name" name="char-name" maxlength="24" placeholder="e.g., Eldrin the Brave" required autocomplete="off">
           </div>
 
           <div class="form-grid">
             <div class="form-group">
               <label for="char-class">Class</label>
               <select id="char-class" name="char-class" required>
-                <option value="Fighter">Fighter (+2 STR, +2 CON, High HP)</option>
-                <option value="Wizard">Wizard (+3 INT, +1 WIS, High Attack)</option>
-                <option value="Rogue">Rogue (+3 DEX, +1 CHA, High Defense)</option>
+                <option value="Fighter">Fighter (+2 STR, +2 CON, Martial Master)</option>
+                <option value="Wizard">Wizard (+3 INT, +1 WIS, Arcane Spellcaster)</option>
+                <option value="Rogue">Rogue (+3 DEX, +1 CHA, Agile Trickster)</option>
+                <option value="Cleric">Cleric (+3 WIS, +1 CON, Holy Smite & Heal)</option>
+                <option value="Ranger">Ranger (+2 DEX, +2 WIS, Precision Shot)</option>
+                <option value="Paladin">Paladin (+2 STR, +2 CON, +1 CHA, Armored Champion)</option>
               </select>
             </div>
 
@@ -45,10 +80,18 @@
               <label for="char-race">Race</label>
               <select id="char-race" name="char-race" required>
                 <option value="Human">Human (+1 All Ability Scores)</option>
-                <option value="Elf">Elf (+2 DEX, +1 INT)</option>
-                <option value="Dwarf">Dwarf (+2 CON, +1 STR)</option>
+                <option value="Elf">Elf (+2 DEX, +1 INT, +1 WIS)</option>
+                <option value="Dwarf">Dwarf (+2 CON, +1 STR, +1 WIS)</option>
+                <option value="Halfling">Halfling (+2 DEX, +1 CON, +1 CHA)</option>
+                <option value="Orc">Orc (+2 STR, +2 CON, Fierce Imposing)</option>
+                <option value="Ignan">Ignan (+2 INT, +1 DEX, Fiery Lineage)</option>
               </select>
             </div>
+          </div>
+
+          <div class="form-group">
+            <label for="world-seed">World Seed (Optional)</label>
+            <input type="text" id="world-seed" name="world-seed" placeholder="Leave blank for random world seed">
           </div>
 
           <!-- Live Preview Box -->
@@ -60,7 +103,7 @@
             <p id="class-description" class="preview-desc"></p>
           </div>
 
-          <button id="btn-start-adventure" type="button" class="btn btn-primary btn-large">Enter the Dungeon</button>
+          <button id="btn-start-adventure" type="button" class="btn btn-primary btn-large">Generate World & Enter</button>
         </form>
       </div>
     </main>
@@ -76,6 +119,9 @@
             <div class="char-name-display" id="display-char-name">Hero Name</div>
             <div class="char-subtitle-display">
               Level <span id="display-level">1</span> <span id="display-race">Human</span> <span id="display-class">Fighter</span>
+            </div>
+            <div class="char-subtitle-display" style="color:#8b5a2b; margin-top:2px;">
+              <span id="display-date">Year 1 — Spring — Day 1</span>
             </div>
           </div>
 
@@ -144,18 +190,27 @@
           </div>
         </section>
 
-        <!-- Panel 2: Dungeon View -->
-        <section class="parchment-card panel-dungeon" aria-labelledby="dungeon-heading">
-          <div class="dungeon-header">
-            <h2 id="dungeon-heading" class="panel-title">Dungeon Area</h2>
-            <div id="room-badge" class="room-badge">Room 1 / 10</div>
+        <!-- Main Display Center Panel: Map or Dungeon -->
+        <section id="panel-center-display" class="parchment-card panel-dungeon" aria-labelledby="center-heading">
+          <!-- World Map View Container -->
+          <div id="world-map-container" class="map-container">
+            <div class="map-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <h3 id="center-heading" class="room-title">Procedural Island Map</h3>
+              <div class="room-badge">WASD / Arrow Keys or Click to Move</div>
+            </div>
+            <canvas id="world-map-canvas" style="border:2px solid #5c4028; border-radius:6px; background:#000; width:100%; max-height:360px; object-fit:contain;"></canvas>
+            <div id="map-location-info" style="margin-top:6px; font-weight:bold; color:#3b2210;">Tile: Unknown</div>
           </div>
 
-          <div id="room-content" class="room-content">
-            <h3 id="room-title" class="room-title">Entering the Shadows</h3>
-            <p id="room-description" class="room-desc">You step into the damp, torch-lit stone hallway...</p>
+          <!-- Dungeon View Container -->
+          <div id="dungeon-container" class="dungeon-container hidden">
+            <div class="dungeon-header">
+              <h3 id="room-title" class="room-title">Entering Dungeon</h3>
+              <div id="room-badge" class="room-badge">Room 1 / 10</div>
+            </div>
+            <p id="room-description" class="room-desc">You step into the dark subterranean dungeon...</p>
 
-            <!-- Monster display box (shown when fighting) -->
+            <!-- Monster Display Box -->
             <div id="monster-box" class="monster-card hidden">
               <div class="monster-header">
                 <h4 id="monster-name">Goblin</h4>
@@ -168,16 +223,17 @@
             </div>
           </div>
 
-          <!-- Dungeon Actions / Controls -->
+          <!-- Controls Panel -->
           <div class="dungeon-actions">
             <!-- Non-combat action -->
             <div id="non-combat-controls" class="action-buttons-group">
-              <button id="btn-room-action" class="btn btn-action">Proceed to Room</button>
+              <button id="btn-room-action" class="btn btn-action">Proceed in Dungeon</button>
             </div>
 
             <!-- Combat actions -->
             <div id="combat-controls" class="action-buttons-group hidden">
               <button id="btn-attack" class="btn btn-combat btn-attack">Attack</button>
+              <button id="btn-skill" class="btn btn-combat btn-secondary">Use Skill</button>
               <button id="btn-defend" class="btn btn-combat btn-defend">Defend</button>
               <button id="btn-combat-potion" class="btn btn-combat btn-potion">Use Potion</button>
               <button id="btn-run" class="btn btn-combat btn-run">Run</button>
@@ -195,12 +251,12 @@
               <div class="slot-item">
                 <span class="slot-label">Weapon:</span>
                 <span id="equipped-weapon-name" class="slot-value">None</span>
-                <button id="btn-unequip-weapon" class="btn btn-mini hidden" title="Unequip Weapon">Unequip</button>
+                <button id="btn-unequip-weapon" class="btn btn-mini hidden">Unequip</button>
               </div>
               <div class="slot-item">
-                <span class="slot-label">Armor/Shield:</span>
+                <span class="slot-label">Shield:</span>
                 <span id="equipped-armor-name" class="slot-value">None</span>
-                <button id="btn-unequip-armor" class="btn btn-mini hidden" title="Unequip Armor">Unequip</button>
+                <button id="btn-unequip-armor" class="btn btn-mini hidden">Unequip</button>
               </div>
             </div>
           </div>
@@ -208,19 +264,19 @@
           <div class="items-section">
             <div class="section-subtitle">Carrying Items</div>
             <div id="inventory-list" class="inventory-list">
-              <!-- Dynamically rendered list of items -->
+              <!-- Dynamically rendered list -->
             </div>
           </div>
         </section>
 
-        <!-- Panel 4: Combat & Event Log -->
+        <!-- Panel 4: Adventure Log -->
         <section class="parchment-card panel-log" aria-labelledby="log-heading">
           <div class="log-header">
             <h2 id="log-heading" class="panel-title">Adventure Log</h2>
-            <button id="btn-clear-log" class="btn btn-mini" title="Clear log messages">Clear</button>
+            <button id="btn-clear-log" class="btn btn-mini">Clear</button>
           </div>
           <div id="combat-log" class="combat-log" role="log" aria-live="polite" aria-relevant="additions">
-            <!-- Dynamic log entries will append here -->
+            <!-- Dynamic log entries -->
           </div>
         </section>
 
@@ -235,12 +291,13 @@
 
         <div class="final-stats-box">
           <h3>Hero Summary</h3>
-          <ul id="victory-stats-list" class="stats-summary-list">
-            <!-- Populated by JS -->
-          </ul>
+          <ul id="victory-stats-list" class="stats-summary-list"></ul>
         </div>
 
-        <button id="btn-victory-restart" class="btn btn-primary btn-large">Start New Adventure</button>
+        <div style="display:flex; gap:10px; justify-content:center;">
+          <button id="btn-victory-continue" class="btn btn-primary btn-large">Continue Open World</button>
+          <button id="btn-victory-restart" class="btn btn-secondary btn-large">New Adventure</button>
+        </div>
       </div>
     </div>
 
@@ -252,9 +309,7 @@
 
         <div class="final-stats-box">
           <h3>Hero Summary</h3>
-          <ul id="gameover-stats-list" class="stats-summary-list">
-            <!-- Populated by JS -->
-          </ul>
+          <ul id="gameover-stats-list" class="stats-summary-list"></ul>
         </div>
 
         <button id="btn-gameover-restart" class="btn btn-danger btn-large">Start New Game</button>
