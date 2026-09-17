@@ -77,11 +77,11 @@ window.DOS = window.DOS || {};
       for (let i = 1; i <= dungeon.totalRooms; i++) {
         if (i === dungeon.totalRooms) {
           // Final Boss Room
-          let bossName = dungeon.isSpecial ? 'Dark Knight' : (dungeon.difficulty >= 6 ? 'Dark Knight' : 'Orc');
-          const template = DOS.MONSTER_CATALOG ? DOS.MONSTER_CATALOG[bossName] : null;
+          let bossKey = dungeon.isSpecial ? 'DarkKnight' : (dungeon.difficulty >= 6 ? 'DarkKnight' : 'Orc');
+          const template = DOS.MONSTER_CATALOG ? DOS.MONSTER_CATALOG[bossKey] : null;
           rooms.push({
             roomNumber: i,
-            title: `Room ${i}: Final Chamber`,
+            title: `Final Chamber`,
             type: 'monster',
             cleared: false,
             monster: template ? JSON.parse(JSON.stringify(template)) : null,

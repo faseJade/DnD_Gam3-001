@@ -88,7 +88,7 @@ window.DOS = window.DOS || {};
               x: placedTile.x,
               y: placedTile.y,
               population: this.rng.int(100, 5000),
-              desc: `${name} is a thriving ${group.type.typeName.toLowerCase()} situated in the ${placedTile.biome}.`,
+              desc: `${name} is a thriving ${group.type.name.toLowerCase()} situated in the ${placedTile.biome}.`,
               danger: group.type.danger,
               shops: ['inn', 'blacksmith', 'general_store', 'guild'],
               discovered: true

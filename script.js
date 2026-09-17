@@ -455,7 +455,11 @@
 
       document.getElementById('creation-view').classList.add('hidden');
       document.getElementById('game-view').classList.remove('hidden');
-      document.getElementById('view-nav-bar').classList.remove('hidden');
+      const navBar = document.getElementById('view-nav-bar');
+      if (navBar) {
+        navBar.classList.remove('hidden');
+        navBar.style.display = 'flex';
+      }
 
       addLog(`Welcome to the world of Dungeon of Shadows, ${state.character.name}!`, 'system');
       addLog(`World Seed: ${state.worldSeed}`, 'system');
