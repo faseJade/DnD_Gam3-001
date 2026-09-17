@@ -640,17 +640,35 @@
         const checkRes = eventGen.performSkillCheck(state, ev.checkSkill, ev.dc);
         addLog(checkRes.logText, checkRes.isSuccess ? 'heal' : 'enemy-hit');
 
-        if (checkRes.isSuccess && ev.rewardGold) {
-          state.character.gold += ev.rewardGold;
-          addLog(`Gained +${ev.rewardGold} Gold!`, 'loot');
-        } else if (!checkRes.isSuccess && ev.triggerMonster) {
-          const monsterTpl = window.DOS.MONSTER_CATALOG[ev.triggerMonster];
-          if (monsterTpl) {
-            state.currentView = 'DUNGEON';
-            state.combat.active = true;
-            state.combat.monster = JSON.parse(JSON.stringify(monsterTpl));
-            state.combat.monster.currentHp = state.combat.monster.maxHp;
-            addLog(`Combat engaged with ${state.combat.monster.name}!`, 'enemy-crit');
+        if (checkRes.isSuccess) {
+          if (ev.onSuccess) addLog(ev.onSuccess, 'system');
+          if (ev.rewardGold) {
+            state.character.gold += ev.rewardGold;
+            addLog(`Gained +${ev.rewardGold} Gold!`, 'loot');
+          }
+          if (ev.healAmount) {
+            const oldHp = state.character.hp;
+            state.character.hp = Math.min(state.character.maxHp, state.character.hp + ev.healAmount);
+            addLog(`Recovered ${state.character.hp - oldHp} HP!`, 'heal');
+          }
+          if (ev.rewardItem && window.DOS.BASE_ITEMS[ev.rewardItem]) {
+            const itemObj = window.DOS.BASE_ITEMS[ev.rewardItem];
+            const slot = state.inventory.find(s => s.item.id === itemObj.id);
+            if (slot) slot.quantity += 1;
+            else state.inventory.push({ item: JSON.parse(JSON.stringify(itemObj)), quantity: 1 });
+            addLog(`Received item: ${itemObj.name}!`, 'loot');
+          }
+        } else {
+          if (ev.onFail) addLog(ev.onFail, 'system');
+          if (ev.triggerMonster) {
+            const monsterTpl = window.DOS.MONSTER_CATALOG[ev.triggerMonster];
+            if (monsterTpl) {
+              state.currentView = 'DUNGEON';
+              state.combat.active = true;
+              state.combat.monster = JSON.parse(JSON.stringify(monsterTpl));
+              state.combat.monster.currentHp = state.combat.monster.maxHp;
+              addLog(`Combat engaged with ${state.combat.monster.name}!`, 'enemy-crit');
+            }
           }
         }
       }
@@ -977,6 +995,7 @@
         state = loaded;
         const worldGen = new window.DOS.WorldGenerator(state.worldSeed);
         world = worldGen.generate();
+        eventGen = new window.DOS.EventGenerator(state.worldSeed);
         dungeonGen = new window.DOS.DungeonGenerator(state.worldSeed);
         world.dungeons = dungeonGen.generateWorldDungeons(world.terrain, world.settlements);
 
@@ -984,6 +1003,7 @@
         document.getElementById('creation-view').classList.add('hidden');
         document.getElementById('game-view').classList.remove('hidden');
         document.getElementById('view-nav-bar').classList.remove('hidden');
+        window.DOS.DebugSystem.init(state, render);
         showToast('Game loaded!');
         render();
       } else {
