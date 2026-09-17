@@ -46,11 +46,13 @@
     </header>
 
     <!-- Navigation View Selector -->
-    <nav id="view-nav-bar" class="nav-bar hidden">
+    <nav id="view-nav-bar" class="nav-bar hidden" style="display:flex; gap:8px;">
       <button id="nav-btn-world" class="btn btn-secondary active">World Map</button>
+      <button id="nav-btn-town" class="btn btn-secondary hidden">Town Hub</button>
       <button id="nav-btn-dungeon" class="btn btn-secondary">Dungeon Area</button>
       <button id="nav-btn-inventory" class="btn btn-secondary">Inventory</button>
-      <button id="nav-btn-quests" class="btn btn-secondary">Quests</button>
+      <button id="nav-btn-quests" class="btn btn-secondary">Quests & Reputation</button>
+      <button id="nav-btn-settings" class="btn btn-secondary">Settings</button>
     </nav>
 
     <!-- Character Creation View -->
@@ -200,6 +202,58 @@
             </div>
             <canvas id="world-map-canvas" style="border:2px solid #5c4028; border-radius:6px; background:#000; width:100%; max-height:360px; object-fit:contain;"></canvas>
             <div id="map-location-info" style="margin-top:6px; font-weight:bold; color:#3b2210;">Tile: Unknown</div>
+          </div>
+
+          <!-- Town View Container -->
+          <div id="town-container" class="town-container hidden">
+            <div class="town-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <div>
+                <h3 id="town-title" class="room-title">Settlement Hub</h3>
+                <div id="town-subtitle" style="font-style:italic; color:#5c4028;">Welcome to town!</div>
+              </div>
+              <button id="btn-leave-town" class="btn btn-secondary">Leave Town</button>
+            </div>
+
+            <div class="town-tabs" style="display:flex; gap:6px; margin-bottom:10px;">
+              <button id="town-tab-inn" class="btn btn-mini btn-secondary active">The Inn</button>
+              <button id="town-tab-shop" class="btn btn-mini btn-secondary">Blacksmith & Shop</button>
+              <button id="town-tab-guild" class="btn btn-mini btn-secondary">Quest Guild Board</button>
+              <button id="town-tab-tavern" class="btn btn-mini btn-secondary">Tavern & NPCs</button>
+            </div>
+
+            <div id="town-tab-content" class="town-tab-content" style="min-height:220px; background:rgba(255,255,255,0.4); padding:10px; border-radius:6px; border:1px solid #8b5a2b;">
+              <!-- Dynamic content -->
+            </div>
+          </div>
+
+          <!-- Quests Panel View Container -->
+          <div id="quests-container" class="quests-container hidden">
+            <h3 class="room-title" style="margin-bottom:8px;">Quest Log & Faction Reputation</h3>
+            <div id="quests-list-content" style="min-height:220px; background:rgba(255,255,255,0.4); padding:10px; border-radius:6px; border:1px solid #8b5a2b;">
+              <!-- Dynamic content -->
+            </div>
+          </div>
+
+          <!-- Settings View Container -->
+          <div id="settings-container" class="settings-container hidden">
+            <h3 class="room-title" style="margin-bottom:8px;">Game Settings & AI Narrator</h3>
+            <div style="background:rgba(255,255,255,0.4); padding:12px; border-radius:6px; border:1px solid #8b5a2b;">
+              <h4>AI Narrator Options (Optional)</h4>
+              <p style="font-size:0.85rem; color:#555; margin-bottom:8px;">Enhance quest and NPC dialogue with local/remote LLM endpoints (OpenAI API compliant).</p>
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                <input type="checkbox" id="setting-narrator-enabled">
+                <label for="setting-narrator-enabled"><strong>Enable AI Narrator</strong> (Disabled by default)</label>
+              </div>
+              <div class="form-group" style="margin-bottom:8px;">
+                <label for="setting-narrator-endpoint">API Endpoint</label>
+                <input type="text" id="setting-narrator-endpoint" placeholder="http://localhost:11434/v1">
+              </div>
+              <div class="form-group" style="margin-bottom:8px;">
+                <label for="setting-narrator-model">Model Name</label>
+                <input type="text" id="setting-narrator-model" placeholder="llama3">
+              </div>
+              <button id="btn-save-settings" class="btn btn-secondary">Save Settings</button>
+            </div>
           </div>
 
           <!-- Dungeon View Container -->

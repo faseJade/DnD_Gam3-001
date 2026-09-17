@@ -69,91 +69,121 @@
       'Save/Load roundtrip preserves character state accurately'
     );
 
-    // 6. Game Starts Without Errors (10 Seeds)
-    let startOk = true;
+    // 6. Game Starts Without Errors Across 10 Seeds
+    let start10Ok = true;
     for (let s = 1; s <= 10; s++) {
       try {
-        const testSeed = `start_seed_${s}`;
+        const testSeed = `real_start_seed_${s}`;
         const st = window.DOS.createInitialState(`Hero_${s}`, 'Wizard', 'Elf', testSeed);
         const wGen = new window.DOS.WorldGenerator(st.worldSeed);
         const w = wGen.generate();
         const dGen = new window.DOS.DungeonGenerator(st.worldSeed);
         w.dungeons = dGen.generateWorldDungeons(w.terrain, w.settlements);
         if (!w || !w.settlements || w.settlements.length === 0 || !w.dungeons || w.dungeons.length === 0) {
-          startOk = false;
+          start10Ok = false;
         }
       } catch (err) {
-        startOk = false;
-        console.error('Start error:', err);
+        start10Ok = false;
       }
     }
-    assert(startOk, 'Game starts without errors for 10 different seeds');
+    assert(start10Ok, 'Game starts without errors for 10 different seeds');
 
-    // 7. Dungeon Boss Monster Key Lookup
-    const testWorld = new window.DOS.WorldGenerator('boss_check_seed').generate();
-    const dGen = new window.DOS.DungeonGenerator('boss_check_seed');
+    // 7. Dungeon of Shadows Existence & Dark Knight Boss
+    const testWorld = new window.DOS.WorldGenerator('boss_seed_777').generate();
+    const dGen = new window.DOS.DungeonGenerator('boss_seed_777');
     testWorld.dungeons = dGen.generateWorldDungeons(testWorld.terrain, testWorld.settlements);
-    let bossOk = true;
-    let dosDarkKnightOk = false;
+    const dosDungeon = testWorld.dungeons.find(d => d.id === 'dungeon_of_shadows');
+    let dosTileMatches = false;
+    if (dosDungeon) {
+      const tile = testWorld.terrain.grid[dosDungeon.y * testWorld.terrain.width + dosDungeon.x];
+      if (tile && tile.locationId === 'dungeon_of_shadows') dosTileMatches = true;
+    }
+    const dosRooms = dGen.generateRoomsForDungeon(dosDungeon, state);
+    const dosLastRoom = dosRooms[dosRooms.length - 1];
+    const dosBossIsDK = dosLastRoom && dosLastRoom.monster && dosLastRoom.monster.name === 'Dark Knight';
+    assert(dosDungeon && dosTileMatches && dosBossIsDK, 'Dungeon of Shadows exists, has locationId set on tile, and Room 10 boss is Dark Knight');
 
+    // 8. Real Room Types Coverage Check (Generator vs Handled List)
+    let allGeneratedTypesValid = true;
     testWorld.dungeons.forEach(d => {
       const rooms = dGen.generateRoomsForDungeon(d, state);
-      const lastRoom = rooms[rooms.length - 1];
-      if (!lastRoom || !lastRoom.monster) bossOk = false;
-      if (d.id === 'dungeon_of_shadows' && lastRoom.monster && lastRoom.monster.name === 'Dark Knight') {
-        dosDarkKnightOk = true;
+      rooms.forEach(r => {
+        if (!window.DOS.ROOM_TYPES.includes(r.type)) allGeneratedTypesValid = false;
+      });
+    });
+    assert(allGeneratedTypesValid, 'Every room type generated across all dungeons is in DOS.ROOM_TYPES');
+
+    // 9. BFS Reachability Check from Starting Town to all Settlements and Dungeons
+    let reachabilityAllSeedsOk = true;
+    for (let s = 1; s <= 10; s++) {
+      const seedStr = `reach_seed_${s}`;
+      const w = new window.DOS.WorldGenerator(seedStr).generate();
+      const dg = new window.DOS.DungeonGenerator(seedStr);
+      w.dungeons = dg.generateWorldDungeons(w.terrain, w.settlements);
+
+      const startS = w.settlements[0];
+      const grid = w.terrain.grid;
+      const width = w.terrain.width;
+      const height = w.terrain.height;
+
+      // BFS to find reachable land tiles
+      const visited = new Set();
+      const queue = [{ x: startS.x, y: startS.y }];
+      visited.add(`${startS.x},${startS.y}`);
+
+      while (queue.length > 0) {
+        const curr = queue.shift();
+        const dirs = [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 }];
+        for (const dir of dirs) {
+          const nx = curr.x + dir.x;
+          const ny = curr.y + dir.y;
+          if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+            const key = `${nx},${ny}`;
+            const tile = grid[ny * width + nx];
+            if (!visited.has(key) && tile.biome && tile.biome !== 'ocean') {
+              visited.add(key);
+              queue.push({ x: nx, y: ny });
+            }
+          }
+        }
       }
-    });
-    assert(bossOk && dosDarkKnightOk, 'Every dungeon has valid boss monster, and Dungeon of Shadows boss is Dark Knight');
 
-    // 8. Room Event Handlers Coverage
-    const roomTypes = ['monster', 'treasure', 'trap', 'shrine', 'empty'];
-    let allHandlersOk = true;
-    roomTypes.forEach(rt => {
-      if (!['monster', 'treasure', 'trap', 'shrine', 'empty'].includes(rt)) allHandlersOk = false;
-    });
-    assert(allHandlersOk, 'Every room type produced by generator has a valid handler');
-
-    // 9. Land & Reachability Check for Settlements and Dungeons
-    let landReachabilityOk = true;
-    testWorld.settlements.forEach(s => {
-      const tile = testWorld.terrain.grid[s.y * testWorld.terrain.width + s.x];
-      if (!tile || tile.biome === 'ocean') landReachabilityOk = false;
-    });
-    testWorld.dungeons.forEach(d => {
-      const tile = testWorld.terrain.grid[d.y * testWorld.terrain.width + d.x];
-      if (!tile || tile.biome === 'ocean') landReachabilityOk = false;
-    });
-    assert(landReachabilityOk, 'Every settlement and dungeon is on land and valid');
-
-    // 10. Potion Full HP Turn Check
-    state.character.hp = state.character.maxHp;
-    state.inventory = [{ item: window.DOS.BASE_ITEMS.potion_health, quantity: 1 }];
-    const potionSlotIdx = 0;
-
-    let usedPotionAtFullHp = false;
-    if (state.character.hp >= state.character.maxHp) {
-      usedPotionAtFullHp = false;
+      // Assert all settlements & dungeons reachable
+      w.settlements.forEach(st => {
+        if (!visited.has(`${st.x},${st.y}`)) reachabilityAllSeedsOk = false;
+      });
+      w.dungeons.forEach(du => {
+        if (!visited.has(`${du.x},${du.y}`)) reachabilityAllSeedsOk = false;
+      });
     }
-    assert(!usedPotionAtFullHp && state.inventory[0].quantity === 1, 'Potion at full HP is not consumed and does not waste turn');
+    assert(reachabilityAllSeedsOk, 'Every settlement and dungeon (including Dungeon of Shadows) is reachable via land BFS across 10 seeds');
 
-    // 11. Dungeon Regeneration Determinism
-    const testState1 = window.DOS.createInitialState('DetHero1', 'Fighter', 'Human', 'regen_seed_888');
-    const testState2 = window.DOS.createInitialState('DetHero2', 'Fighter', 'Human', 'regen_seed_888');
-    testState1.dungeons['dungeon_of_shadows'] = { cleared: true, clearedOnDay: 1, regenCount: 2 };
-    testState2.dungeons['dungeon_of_shadows'] = { cleared: true, clearedOnDay: 1, regenCount: 2 };
+    // 10. Real Potion Usage at Full HP
+    const potState = window.DOS.createInitialState('PotHero', 'Fighter', 'Human', seed);
+    potState.character.hp = potState.character.maxHp; // Full HP
+    potState.inventory = [{ item: window.DOS.BASE_ITEMS.potion_health, quantity: 1 }];
 
-    const roomsDet1 = dGen.generateRoomsForDungeon(testWorld.dungeons[0], testState1);
-    const roomsDet2 = dGen.generateRoomsForDungeon(testWorld.dungeons[0], testState2);
+    const potResult = window.DOS.usePotion(potState, 0);
     assert(
-      roomsDet1.length === roomsDet2.length && roomsDet1[0].title === roomsDet2[0].title,
-      'Dungeon regeneration is deterministic for same seed and regen count'
+      potResult === false && potState.inventory[0].quantity === 1 && potState.character.hp === potState.character.maxHp,
+      'DOS.usePotion at full HP returns false, consumes no potion, and leaves HP unchanged'
     );
 
+    // 11. Save/Load Event Generator System Re-creation
+    window.DOS.saveGame(potState);
+    const loadedSt = window.DOS.loadGame();
+    const reEvGen = new window.DOS.EventGenerator(loadedSt.worldSeed);
+    const travelEv = reEvGen.checkTravelEvent(loadedSt, { danger: 3, hasRoad: false });
+    assert(loadedSt && reEvGen && typeof travelEv !== 'undefined', 'After save -> load, event generator system re-initializes and fires travel events');
+
     // 12. Quests Target Verification
-    const qGen = new window.DOS.QuestGenerator('quest_test_seed');
+    const qGen = new window.DOS.QuestGenerator('quest_test_seed_99');
     const townQuests = qGen.generateTownQuests(testWorld.settlements[0], 1);
-    assert(townQuests.length > 0 && townQuests[0].title, 'Every generated quest references valid target and reward');
+    let questsValid = townQuests.length > 0;
+    townQuests.forEach(q => {
+      if (!q.giverTownId || !testWorld.settlements.some(s => s.id === q.giverTownId)) questsValid = false;
+    });
+    assert(questsValid, 'Generated quests reference valid giver settlements in the world');
 
     // Summary
     const summary = document.createElement('h2');

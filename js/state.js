@@ -131,9 +131,40 @@ window.DOS = window.DOS || {};
     };
   }
 
+  function usePotion(state, slotIndex, logCallback, toastCallback) {
+    if (!state || !state.inventory || !state.inventory[slotIndex]) return false;
+    const slot = state.inventory[slotIndex];
+    const item = slot.item;
+
+    if (!item || item.type !== 'potion') return false;
+
+    if (state.character.hp >= state.character.maxHp) {
+      if (logCallback) logCallback('You are already at full HP!', 'info');
+      if (toastCallback) toastCallback('Already at full HP!');
+      return false;
+    }
+
+    const healAmt = item.healAmount || 15;
+    const oldHp = state.character.hp;
+    state.character.hp = Math.min(state.character.maxHp, state.character.hp + healAmt);
+    const recovered = state.character.hp - oldHp;
+
+    slot.quantity -= 1;
+    if (slot.quantity <= 0) {
+      state.inventory.splice(slotIndex, 1);
+    }
+
+    if (logCallback) logCallback(`Used ${item.name} and recovered ${recovered} HP!`, 'heal');
+    return true;
+  }
+
+  const ROOM_TYPES = ['monster', 'treasure', 'trap', 'shrine', 'empty'];
+
   DOS.clamp = clamp;
   DOS.getStatModifier = getStatModifier;
   DOS.validateCharacter = validateCharacter;
   DOS.createInitialState = createInitialState;
+  DOS.usePotion = usePotion;
+  DOS.ROOM_TYPES = ROOM_TYPES;
 
 })(window.DOS);

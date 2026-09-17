@@ -25,30 +25,74 @@ window.DOS = window.DOS || {};
       // 1. Hand-crafted Special Dungeon: The Dungeon of Shadows (Dark Knight Arc)
       // Placed near starting area
       const startS = settlements[0];
+      const W = terrainData.width;
+      const H = terrainData.height;
+      // Find the closest free land tile (at least 3 tiles from the start town)
+      let dosPos = null;
+      for (let r = 3; r < Math.max(W, H) && !dosPos; r++) {
+        for (let dy = -r; dy <= r && !dosPos; dy++) {
+          for (let dx = -r; dx <= r && !dosPos; dx++) {
+            if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+            const x = startS.x + dx;
+            const y = startS.y + dy;
+            if (x < 1 || y < 1 || x >= W - 1 || y >= H - 1) continue;
+            const t = terrainData.grid[y * W + x];
+            if (t.biome && t.biome !== 'ocean' && !t.locationId) dosPos = { x, y };
+          }
+        }
+      }
+      if (!dosPos) dosPos = { x: startS.x, y: startS.y };
       const dosDungeon = {
         id: 'dungeon_of_shadows',
         name: 'Dungeon of Shadows',
         isSpecial: true,
-        x: Math.min(terrainData.width - 2, startS.x + 3),
-        y: Math.min(terrainData.height - 2, startS.y + 3),
+        x: dosPos.x,
+        y: dosPos.y,
         difficulty: 4,
         totalRooms: 10,
         regenCooldownDays: 10,
         desc: 'The legendary Dungeon of Shadows where the Dark Knight awaits at Room 10.'
       };
       dungeons.push(dosDungeon);
+      const dosTile = terrainData.grid[dosPos.y * W + dosPos.x];
+      if (dosTile && !dosTile.locationId) dosTile.locationId = dosDungeon.id;
 
-      // 2. Procedural Dungeons scattered across the world
+      // 2. Procedural Dungeons scattered across the world on reachable land
+      const grid = terrainData.grid;
+
+      // Find all tiles reachable from startS via BFS
+      const reachableSet = new Set();
+      if (startS) {
+        const q = [{ x: startS.x, y: startS.y }];
+        reachableSet.add(`${startS.x},${startS.y}`);
+        while (q.length > 0) {
+          const curr = q.shift();
+          const dirs = [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 }];
+          for (const dir of dirs) {
+            const nx = curr.x + dir.x;
+            const ny = curr.y + dir.y;
+            if (nx >= 0 && nx < W && ny >= 0 && ny < H) {
+              const key = `${nx},${ny}`;
+              const tile = grid[ny * W + nx];
+              if (!reachableSet.has(key) && tile.biome && tile.biome !== 'ocean') {
+                reachableSet.add(key);
+                q.push({ x: nx, y: ny });
+              }
+            }
+          }
+        }
+      }
+
       let count = 1;
-      for (let y = 8; y < terrainData.height - 8; y += 12) {
-        for (let x = 8; x < terrainData.width - 8; x += 12) {
-          const tile = terrainData.grid[y * terrainData.width + x];
-          if (tile.biome !== 'ocean' && !tile.locationId) {
+      for (let y = 8; y < H - 8; y += 10) {
+        for (let x = 8; x < W - 8; x += 10) {
+          const tile = grid[y * W + x];
+          if (tile.biome !== 'ocean' && !tile.locationId && reachableSet.has(`${x},${y}`)) {
             const theme = rng.pick(DUNGEON_THEMES);
-            const id = `procedural_dungeon_${count++}`;
+            const id = `procedural_dungeon_${count}`;
             const dungeon = {
               id: id,
-              name: `${theme.type} #${count}`,
+              name: `${theme.type} #${count++}`,
               isSpecial: false,
               x: x,
               y: y,
@@ -97,7 +141,7 @@ window.DOS = window.DOS || {};
           }
           rooms.push({
             roomNumber: i,
-            title: `Room ${i}: Subterranean Hall`,
+            title: `Subterranean Hall`,
             type: rType,
             cleared: false,
             monster: monster,

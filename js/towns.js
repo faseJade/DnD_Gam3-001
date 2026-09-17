@@ -30,12 +30,53 @@ window.DOS = window.DOS || {};
       const settlements = [];
       const { width, height, grid } = terrainData;
 
-      // Eligible tiles: Plains, Beach, or Forest (elevation between 0.28 and 0.52)
+      // Find main connected land mass via BFS starting near map center
+      const centerX = Math.floor(width / 2);
+      const centerY = Math.floor(height / 2);
+      let centerLand = null;
+
+      // Find land tile closest to center
+      for (let r = 0; r < Math.max(width, height) && !centerLand; r++) {
+        for (let dy = -r; dy <= r && !centerLand; dy++) {
+          for (let dx = -r; dx <= r && !centerLand; dx++) {
+            const tx = centerX + dx;
+            const ty = centerY + dy;
+            if (tx >= 0 && tx < width && ty >= 0 && ty < height) {
+              const tile = grid[ty * width + tx];
+              if (tile.biome && tile.biome !== 'ocean') centerLand = tile;
+            }
+          }
+        }
+      }
+
+      const mainLandSet = new Set();
+      if (centerLand) {
+        const q = [{ x: centerLand.x, y: centerLand.y }];
+        mainLandSet.add(`${centerLand.x},${centerLand.y}`);
+        while (q.length > 0) {
+          const curr = q.shift();
+          const dirs = [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 }];
+          for (const dir of dirs) {
+            const nx = curr.x + dir.x;
+            const ny = curr.y + dir.y;
+            if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+              const key = `${nx},${ny}`;
+              const tile = grid[ny * width + nx];
+              if (!mainLandSet.has(key) && tile.biome && tile.biome !== 'ocean') {
+                mainLandSet.add(key);
+                q.push({ x: nx, y: ny });
+              }
+            }
+          }
+        }
+      }
+
+      // Eligible tiles: Plains, Beach, or Forest on the main land mass
       const eligible = [];
       for (let y = 5; y < height - 5; y++) {
         for (let x = 5; x < width - 5; x++) {
           const tile = grid[y * width + x];
-          if ((tile.biome === 'plains' || tile.biome === 'beach' || tile.biome === 'forest') && !tile.hasRoad) {
+          if ((tile.biome === 'plains' || tile.biome === 'beach' || tile.biome === 'forest') && !tile.hasRoad && mainLandSet.has(`${x},${y}`)) {
             eligible.push(tile);
           }
         }

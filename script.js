@@ -8,6 +8,10 @@
   let mapSystem = null;
   let eventGen = null;
   let dungeonGen = null;
+  let questGen = null;
+  let npcGen = null;
+  let narratorSys = null;
+  let activeTownTab = 'inn';
 
   function showToast(message) {
     const container = document.getElementById('toast-container');
@@ -115,39 +119,79 @@
       showGameOverModal();
     }
 
-    // Map vs Dungeon Visibility
+    // Center Display Panels
     const mapContainer = document.getElementById('world-map-container');
+    const townContainer = document.getElementById('town-container');
     const dungeonContainer = document.getElementById('dungeon-container');
+    const questsContainer = document.getElementById('quests-container');
+    const settingsContainer = document.getElementById('settings-container');
     const nonCombatControls = document.getElementById('non-combat-controls');
     const combatControls = document.getElementById('combat-controls');
+    const navBtnTown = document.getElementById('nav-btn-town');
+
+    // Check if player is on a settlement tile
+    const currentTile = world ? world.terrain.grid[state.playerPos.y * world.terrain.width + state.playerPos.x] : null;
+    let currentSettlement = null;
+    if (currentTile && currentTile.locationId && world) {
+      currentSettlement = world.settlements.find(s => s.id === currentTile.locationId);
+    }
+
+    if (currentSettlement) {
+      if (navBtnTown) navBtnTown.classList.remove('hidden');
+    } else {
+      if (navBtnTown) navBtnTown.classList.add('hidden');
+      if (state.currentView === 'TOWN') state.currentView = 'WORLD_MAP';
+    }
+
+    mapContainer.classList.add('hidden');
+    if (townContainer) townContainer.classList.add('hidden');
+    dungeonContainer.classList.add('hidden');
+    if (questsContainer) questsContainer.classList.add('hidden');
+    if (settingsContainer) settingsContainer.classList.add('hidden');
 
     if (state.currentView === 'WORLD_MAP') {
       mapContainer.classList.remove('hidden');
-      dungeonContainer.classList.add('hidden');
       nonCombatControls.classList.add('hidden');
       combatControls.classList.add('hidden');
 
-      // Update Fog & Render Canvas
       if (mapSystem && world) {
         mapSystem.updateFogOfWar(state, world.terrain);
         mapSystem.render(state, world);
       }
 
-      // Tile info
-      const tile = world.terrain.grid[state.playerPos.y * world.terrain.width + state.playerPos.x];
       const locInfo = document.getElementById('map-location-info');
-      if (locInfo && tile) {
-        let nameStr = tile.biome.toUpperCase();
-        if (tile.locationId) {
-          const s = world.settlements.find(s => s.id === tile.locationId);
-          const d = world.dungeons.find(d => d.id === tile.locationId);
+      if (locInfo && currentTile) {
+        let nameStr = currentTile.biome.toUpperCase();
+        if (currentTile.locationId) {
+          const s = world.settlements.find(s => s.id === currentTile.locationId);
+          const d = world.dungeons.find(d => d.id === currentTile.locationId);
           if (s) nameStr = `${s.name} (${s.typeName})`;
           if (d) nameStr = `${d.name} [Danger: ${d.difficulty}/10]`;
         }
-        locInfo.textContent = `Location: (${tile.x}, ${tile.y}) — ${nameStr}`;
+        locInfo.textContent = `Location: (${currentTile.x}, ${currentTile.y}) — ${nameStr}`;
       }
+    } else if (state.currentView === 'TOWN' && currentSettlement) {
+      if (townContainer) townContainer.classList.remove('hidden');
+      nonCombatControls.classList.add('hidden');
+      combatControls.classList.add('hidden');
+
+      setText('town-title', `${currentSettlement.symbol} ${currentSettlement.name}`);
+      setText('town-subtitle', `${currentSettlement.typeName} — Population ${currentSettlement.population}`);
+      renderTownContent(currentSettlement);
+
+    } else if (state.currentView === 'QUESTS') {
+      if (questsContainer) questsContainer.classList.remove('hidden');
+      nonCombatControls.classList.add('hidden');
+      combatControls.classList.add('hidden');
+      renderQuestsPanel();
+
+    } else if (state.currentView === 'SETTINGS') {
+      if (settingsContainer) settingsContainer.classList.remove('hidden');
+      nonCombatControls.classList.add('hidden');
+      combatControls.classList.add('hidden');
+      renderSettingsPanel();
+
     } else if (state.currentView === 'DUNGEON') {
-      mapContainer.classList.add('hidden');
       dungeonContainer.classList.remove('hidden');
 
       const dState = state.dungeon;
@@ -261,16 +305,16 @@
   }
 
   function useInventoryPotion(slotIndex) {
-    if (!state || !state.inventory[slotIndex]) return;
+    if (!state || !state.inventory[slotIndex]) return false;
     const slot = state.inventory[slotIndex];
     const item = slot.item;
 
-    if (item.type !== 'potion') return;
+    if (item.type !== 'potion') return false;
 
     if (state.character.hp >= state.character.maxHp) {
       addLog('You are already at full HP!', 'info');
       showToast('Already at full HP!');
-      return;
+      return false;
     }
 
     const healAmt = item.healAmount || 15;
@@ -285,6 +329,7 @@
 
     addLog(`Used ${item.name} and recovered ${recovered} HP!`, 'heal');
     render();
+    return true;
   }
 
   function equipInventoryItem(slotIndex) {
@@ -332,6 +377,222 @@
       `;
     }
     modal.classList.remove('hidden');
+  }
+
+  function renderTownContent(settlement) {
+    const contentEl = document.getElementById('town-tab-content');
+    if (!contentEl) return;
+    contentEl.innerHTML = '';
+
+    if (activeTownTab === 'inn') {
+      const cost = 15;
+      contentEl.innerHTML = `
+        <h4>The Travelers Inn</h4>
+        <p>Rest your weary head in a warm bed. Restores all HP and advances time by 8 hours.</p>
+        <p><strong>Cost:</strong> ${cost} Gold</p>
+        <button id="btn-town-rest" class="btn btn-primary" ${state.character.gold < cost ? 'disabled' : ''}>Rest at Inn (${cost} Gold)</button>
+      `;
+      const btnRest = document.getElementById('btn-town-rest');
+      if (btnRest) {
+        btnRest.addEventListener('click', () => {
+          if (state.character.gold >= cost) {
+            state.character.gold -= cost;
+            state.character.hp = state.character.maxHp;
+            window.DOS.TimeSystem.advanceTime(state, 8);
+            addLog(`Rested at ${settlement.name} Inn. Full HP restored!`, 'heal');
+            showToast('Rested fully!');
+            render();
+          }
+        });
+      }
+    } else if (activeTownTab === 'shop') {
+      const shopItems = [
+        window.DOS.BASE_ITEMS.potion_health,
+        window.DOS.BASE_ITEMS.potion_greater,
+        window.DOS.BASE_ITEMS.sword,
+        window.DOS.BASE_ITEMS.shield,
+        window.DOS.BASE_ITEMS.wand
+      ];
+
+      let shopHtml = '<h4>Blacksmith & General Store</h4><div style="display:flex; flex-direction:column; gap:8px;">';
+      shopItems.forEach(item => {
+        const val = item.value || 20;
+        shopHtml += `
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #c59b27; padding-bottom:4px;">
+            <div>
+              <strong>${item.name}</strong> (${item.type}) - ${item.desc}
+              <div style="font-size:0.85rem; color:#8b5a2b;">Price: ${val} Gold</div>
+            </div>
+            <button class="btn btn-mini btn-buy-item" data-id="${item.id}">Buy (${val}g)</button>
+          </div>
+        `;
+      });
+      shopHtml += '</div>';
+
+      // Player Inventory Selling Section
+      if (state.inventory && state.inventory.length > 0) {
+        shopHtml += '<h4 style="margin-top:12px;">Sell Inventory (50% Value)</h4><div style="display:flex; flex-direction:column; gap:6px;">';
+        state.inventory.forEach((slot, idx) => {
+          const item = slot.item;
+          const sellVal = Math.floor((item.value || 20) * 0.5);
+          shopHtml += `
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed #8b5a2b; padding-bottom:4px;">
+              <div><strong>${item.name} x${slot.quantity}</strong> (Sell: ${sellVal} Gold)</div>
+              <button class="btn btn-mini btn-sell-item" data-idx="${idx}">Sell (${sellVal}g)</button>
+            </div>
+          `;
+        });
+        shopHtml += '</div>';
+      }
+
+      contentEl.innerHTML = shopHtml;
+
+      contentEl.querySelectorAll('.btn-buy-item').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const itemId = e.target.getAttribute('data-id');
+          const item = window.DOS.BASE_ITEMS[itemId];
+          const cost = item ? (item.value || 20) : 20;
+
+          if (state.character.gold >= cost) {
+            state.character.gold -= cost;
+            const slot = state.inventory.find(s => s.item.id === item.id);
+            if (slot) slot.quantity += 1;
+            else state.inventory.push({ item: JSON.parse(JSON.stringify(item)), quantity: 1 });
+
+            addLog(`Bought ${item.name} for ${cost} Gold!`, 'loot');
+            showToast(`Bought ${item.name}!`);
+            render();
+          } else {
+            showToast('Not enough gold!');
+          }
+        });
+      });
+
+      contentEl.querySelectorAll('.btn-sell-item').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const idx = parseInt(e.target.getAttribute('data-idx'), 10);
+          if (state.inventory[idx]) {
+            const slot = state.inventory[idx];
+            const sellVal = Math.floor((slot.item.value || 20) * 0.5);
+            state.character.gold += sellVal;
+            slot.quantity -= 1;
+            if (slot.quantity <= 0) state.inventory.splice(idx, 1);
+            addLog(`Sold ${slot.item.name} for ${sellVal} Gold!`, 'loot');
+            showToast(`Sold item!`);
+            render();
+          }
+        });
+      });
+    } else if (activeTownTab === 'guild') {
+      if (!questGen) questGen = new window.DOS.QuestGenerator(state.worldSeed);
+      const townQuests = questGen.generateTownQuests(settlement, state.date.totalDays);
+
+      let questHtml = '<h4>Adventurer Guild Quest Board</h4><div style="display:flex; flex-direction:column; gap:8px;">';
+      townQuests.forEach(q => {
+        const isAccepted = state.quests && state.quests.active.some(aq => aq.id === q.id);
+        questHtml += `
+          <div style="border:1px solid #8b5a2b; padding:8px; border-radius:4px; background:rgba(255,255,255,0.6);">
+            <div style="font-weight:bold; color:#701313;">${q.title}</div>
+            <div style="font-size:0.9rem; margin:4px 0;">${q.desc}</div>
+            <div style="font-size:0.85rem; color:#4a5d4e;">Reward: +${q.goldReward} Gold, +${q.xpReward} XP</div>
+            <button class="btn btn-mini btn-accept-quest" data-id="${q.id}" ${isAccepted ? 'disabled' : ''}>
+              ${isAccepted ? 'Accepted' : 'Accept Quest'}
+            </button>
+          </div>
+        `;
+      });
+      questHtml += '</div>';
+      contentEl.innerHTML = questHtml;
+
+      contentEl.querySelectorAll('.btn-accept-quest').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const qId = e.target.getAttribute('data-id');
+          const questObj = townQuests.find(q => q.id === qId);
+          if (questObj && state.quests) {
+            state.quests.active.push(JSON.parse(JSON.stringify(questObj)));
+            addLog(`Accepted quest: ${questObj.title}!`, 'system');
+            showToast('Quest accepted!');
+            render();
+          }
+        });
+      });
+    } else if (activeTownTab === 'tavern') {
+      if (!npcGen) npcGen = new window.DOS.NPCGenerator(state.worldSeed);
+      const npcs = npcGen.generateSettlementNPCs(settlement);
+
+      let npcHtml = '<h4>Tavern & Local Folk</h4><div style="display:flex; flex-direction:column; gap:8px;">';
+      npcs.forEach(npc => {
+        npcHtml += `
+          <div style="border:1px solid #8b5a2b; padding:8px; border-radius:4px; background:rgba(255,255,255,0.6);">
+            <div style="font-weight:bold; color:#2e7d32;">${npc.name} (${npc.race} ${npc.occupation})</div>
+            <div style="font-size:0.9rem; font-style:italic; margin:4px 0;">"${npc.rumour}"</div>
+            <button class="btn btn-mini btn-talk-npc" data-name="${npc.name}" data-occ="${npc.occupation}" data-race="${npc.race}">Talk / Hear Rumours</button>
+          </div>
+        `;
+      });
+      npcHtml += '</div>';
+      contentEl.innerHTML = npcHtml;
+
+      contentEl.querySelectorAll('.btn-talk-npc').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const name = e.target.getAttribute('data-name');
+          const occ = e.target.getAttribute('data-occ');
+          const race = e.target.getAttribute('data-race');
+
+          if (!narratorSys) narratorSys = new window.DOS.NarratorSystem();
+          const dlg = await narratorSys.generateNPCDialogue({ name: name, occupation: occ, race: race }, '', state);
+          addLog(`[Tavern] ${dlg}`, 'system');
+        });
+      });
+    }
+  }
+
+  function renderQuestsPanel() {
+    const contentEl = document.getElementById('quests-list-content');
+    if (!contentEl) return;
+
+    let html = '<h4>Active Quests</h4>';
+    if (!state.quests || state.quests.active.length === 0) {
+      html += '<p style="font-style:italic; color:#666;">No active quests. Visit a Town Guild Board to accept contracts.</p>';
+    } else {
+      html += '<div style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;">';
+      state.quests.active.forEach(q => {
+        html += `
+          <div style="border:1px solid #8b5a2b; padding:8px; border-radius:4px; background:${q.completed ? '#e8f5e9' : 'rgba(255,255,255,0.6)'};">
+            <div style="font-weight:bold;">${q.title} ${q.completed ? '✅ (COMPLETED)' : ''}</div>
+            <div style="font-size:0.9rem;">${q.desc}</div>
+            <div style="font-size:0.85rem; color:#701313;">Reward: +${q.goldReward} Gold, +${q.xpReward} XP</div>
+          </div>
+        `;
+      });
+      html += '</div>';
+    }
+
+    html += '<h4 style="margin-top:12px;">Faction Reputation</h4>';
+    if (state.reputation) {
+      html += `<p><strong>Global Renown:</strong> ${state.reputation.global}</p>`;
+      if (Object.keys(state.reputation.settlements).length > 0) {
+        html += '<ul>';
+        for (const [sId, repVal] of Object.entries(state.reputation.settlements)) {
+          html += `<li>Settlement ${sId}: ${repVal} Rep</li>`;
+        }
+        html += '</ul>';
+      }
+    }
+
+    contentEl.innerHTML = html;
+  }
+
+  function renderSettingsPanel() {
+    const chkNarrator = document.getElementById('setting-narrator-enabled');
+    const txtEndpoint = document.getElementById('setting-narrator-endpoint');
+    const txtModel = document.getElementById('setting-narrator-model');
+
+    if (state && state.narrator) {
+      if (chkNarrator) chkNarrator.checked = !!state.narrator.enabled;
+      if (txtEndpoint) txtEndpoint.value = state.narrator.endpoint || '';
+      if (txtModel) txtModel.value = state.narrator.model || 'llama3';
+    }
   }
 
   function showVictoryModal() {
@@ -400,12 +661,11 @@
       const s = world.settlements.find(s => s.id === tile.locationId);
       const d = world.dungeons.find(d => d.id === tile.locationId);
       if (s) {
-        addLog(`Arrived at ${s.name} (${s.typeName}). Rested and healed fully!`, 'heal');
-        state.character.hp = state.character.maxHp;
+        addLog(`Entered ${s.name} (${s.typeName}). Welcome!`, 'heal');
+        state.currentView = 'TOWN';
       } else if (d) {
         addLog(`Entered ${d.name} [Difficulty ${d.difficulty}/10].`, 'system');
         state.currentView = 'DUNGEON';
-        // Generate rooms
         const rooms = dungeonGen.generateRoomsForDungeon(d, state);
         state.dungeon = {
           currentRoom: 1,
@@ -478,12 +738,78 @@
       if (['ArrowRight', 'KeyD'].includes(e.code)) handleMovePlayer(1, 0);
     });
 
-    // Navigation buttons
+    // Navigation buttons (blocked during combat)
+    const checkCombatViewBlock = () => {
+      if (state && state.combat && state.combat.active) {
+        showToast('Finish the fight (or run) first!');
+        return true;
+      }
+      return false;
+    };
+
     document.getElementById('nav-btn-world').addEventListener('click', () => {
-      if (state) { state.currentView = 'WORLD_MAP'; render(); }
+      if (!state || checkCombatViewBlock()) return;
+      state.currentView = 'WORLD_MAP';
+      render();
+    });
+    document.getElementById('nav-btn-town').addEventListener('click', () => {
+      if (!state || checkCombatViewBlock()) return;
+      state.currentView = 'TOWN';
+      render();
     });
     document.getElementById('nav-btn-dungeon').addEventListener('click', () => {
-      if (state) { state.currentView = 'DUNGEON'; render(); }
+      if (!state || checkCombatViewBlock()) return;
+      state.currentView = 'DUNGEON';
+      render();
+    });
+    document.getElementById('nav-btn-inventory').addEventListener('click', () => {
+      if (!state || checkCombatViewBlock()) return;
+      const invPanel = document.querySelector('.panel-inventory');
+      if (invPanel) invPanel.scrollIntoView({ behavior: 'smooth' });
+    });
+    document.getElementById('nav-btn-quests').addEventListener('click', () => {
+      if (!state || checkCombatViewBlock()) return;
+      state.currentView = 'QUESTS';
+      render();
+    });
+    document.getElementById('nav-btn-settings').addEventListener('click', () => {
+      if (!state || checkCombatViewBlock()) return;
+      state.currentView = 'SETTINGS';
+      render();
+    });
+
+    document.getElementById('btn-leave-town').addEventListener('click', () => {
+      if (!state) return;
+      state.currentView = 'WORLD_MAP';
+      render();
+    });
+
+    // Town Sub-tab buttons
+    ['inn', 'shop', 'guild', 'tavern'].forEach(tab => {
+      const btn = document.getElementById(`town-tab-${tab}`);
+      if (btn) {
+        btn.addEventListener('click', () => {
+          activeTownTab = tab;
+          document.querySelectorAll('.town-tabs button').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          render();
+        });
+      }
+    });
+
+    // Settings Save Button
+    document.getElementById('btn-save-settings').addEventListener('click', () => {
+      if (!state || !state.narrator) return;
+      const chk = document.getElementById('setting-narrator-enabled');
+      const endp = document.getElementById('setting-narrator-endpoint');
+      const mdl = document.getElementById('setting-narrator-model');
+
+      state.narrator.enabled = chk ? chk.checked : false;
+      state.narrator.endpoint = endp ? endp.value.trim() : '';
+      state.narrator.model = mdl ? mdl.value.trim() : 'llama3';
+
+      showToast('Settings saved!');
+      render();
     });
 
     // Dungeon room progression button
@@ -524,7 +850,7 @@
         const trapDmg = room.damage || (3 + window.DOS.rollDie(6));
         state.character.hp = Math.max(0, state.character.hp - trapDmg);
         addLog(`TRAP TRIGGERED! You take ${trapDmg} damage!`, 'enemy-hit');
-      } else if (room.type === 'healing') {
+      } else if (room.type === 'shrine' || room.type === 'healing') {
         const oldHp = state.character.hp;
         state.character.hp = state.character.maxHp;
         addLog(`Healing Shrine! HP restored from ${oldHp} to ${state.character.maxHp}!`, 'heal');
@@ -557,7 +883,7 @@
         showToast('No potions available!');
         return;
       }
-      useInventoryPotion(potIdx);
+      if (!useInventoryPotion(potIdx)) { render(); return; }
       window.DOS.CombatSystem.executeEnemyTurn(state, addLog);
       render();
     });
