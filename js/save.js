@@ -63,6 +63,11 @@ window.DOS = window.DOS || {};
       loaded.equipment = loaded.equipment || {};
       loaded.logs = Array.isArray(loaded.logs) ? loaded.logs : [];
 
+      loaded.combat = loaded.combat || { active: false, context: null, isPlayerDefending: false, monster: null, meta: {} };
+      if (loaded.combat.active && !loaded.combat.context) {
+        loaded.combat.context = loaded.dungeon ? 'dungeon' : 'wilderness';
+      }
+
       return loaded;
     } catch (err) {
       console.error('Load failed / corrupted save:', err);

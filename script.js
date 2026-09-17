@@ -128,6 +128,7 @@
     const nonCombatControls = document.getElementById('non-combat-controls');
     const combatControls = document.getElementById('combat-controls');
     const navBtnTown = document.getElementById('nav-btn-town');
+    const navBtnDungeon = document.getElementById('nav-btn-dungeon');
 
     // Check if player is on a settlement tile
     const currentTile = world ? world.terrain.grid[state.playerPos.y * world.terrain.width + state.playerPos.x] : null;
@@ -141,6 +142,19 @@
     } else {
       if (navBtnTown) navBtnTown.classList.add('hidden');
       if (state.currentView === 'TOWN') state.currentView = 'WORLD_MAP';
+    }
+
+    // Nav button state for Current Dungeon
+    if (navBtnDungeon) {
+      if (state.dungeon) {
+        navBtnDungeon.removeAttribute('disabled');
+        navBtnDungeon.title = 'Return to active dungeon';
+        navBtnDungeon.style.opacity = '1';
+      } else {
+        navBtnDungeon.setAttribute('disabled', 'disabled');
+        navBtnDungeon.title = 'You are not inside a dungeon';
+        navBtnDungeon.style.opacity = '0.5';
+      }
     }
 
     mapContainer.classList.add('hidden');
@@ -194,20 +208,28 @@
     } else if (state.currentView === 'DUNGEON') {
       dungeonContainer.classList.remove('hidden');
 
-      const dState = state.dungeon;
-      if (dState && dState.rooms) {
-        const room = dState.rooms[dState.currentRoom - 1] || dState.roomState || {};
-        setText('room-title', room.title || 'Dungeon Chamber');
-        setText('room-badge', `Room ${dState.currentRoom} / ${dState.totalRooms}`);
-        setText('room-description', room.desc || 'A silent corridor echoing with ancient power.');
+      const vm = window.DOS.getCombatViewModel(state);
+      setText('center-heading', vm.heading);
+      setText('room-title', vm.title);
+      setText('room-description', vm.description);
 
-        const btnRoomAction = document.getElementById('btn-room-action');
-        if (btnRoomAction) {
-          if (dState.currentRoom >= dState.totalRooms && !state.combat.active) {
-            btnRoomAction.textContent = 'Exit Dungeon';
-          } else {
-            btnRoomAction.textContent = 'Proceed to Next Room';
-          }
+      const roomBadgeEl = document.getElementById('room-badge');
+      if (roomBadgeEl) {
+        if (vm.showRoomBadge) {
+          roomBadgeEl.classList.remove('hidden');
+          roomBadgeEl.textContent = vm.badge;
+        } else {
+          roomBadgeEl.classList.add('hidden');
+        }
+      }
+
+      const btnRoomAction = document.getElementById('btn-room-action');
+      if (btnRoomAction) {
+        if (!vm.showRoomBadge) {
+          btnRoomAction.classList.add('hidden');
+        } else {
+          btnRoomAction.classList.remove('hidden');
+          btnRoomAction.textContent = vm.primaryButton;
         }
       }
 
@@ -225,6 +247,21 @@
         document.getElementById('monster-box').classList.add('hidden');
         combatControls.classList.add('hidden');
         nonCombatControls.classList.remove('hidden');
+
+        // Handle Non-Combat primary action in wilderness vs dungeon
+        if (!vm.showRoomBadge) {
+          // In wilderness after combat win, show Continue Journey
+          const btnContinue = document.createElement('button');
+          btnContinue.id = 'btn-continue-journey';
+          btnContinue.className = 'btn btn-primary';
+          btnContinue.textContent = 'Continue Journey';
+          nonCombatControls.innerHTML = '';
+          nonCombatControls.appendChild(btnContinue);
+          btnContinue.addEventListener('click', () => {
+            state.currentView = 'WORLD_MAP';
+            render();
+          });
+        }
       }
     }
 
@@ -661,14 +698,12 @@
         } else {
           if (ev.onFail) addLog(ev.onFail, 'system');
           if (ev.triggerMonster) {
-            const monsterTpl = window.DOS.MONSTER_CATALOG[ev.triggerMonster];
-            if (monsterTpl) {
-              state.currentView = 'DUNGEON';
-              state.combat.active = true;
-              state.combat.monster = JSON.parse(JSON.stringify(monsterTpl));
-              state.combat.monster.currentHp = state.combat.monster.maxHp;
-              addLog(`Combat engaged with ${state.combat.monster.name}!`, 'enemy-crit');
-            }
+            window.DOS.startCombat(state, ev.triggerMonster, 'wilderness', {
+              eventTitle: ev.title,
+              biome: tile.biome,
+              pos: { x: nx, y: ny }
+            });
+            addLog(`A ${state.combat.monster.name} ambushes you on the road!`, 'enemy-crit');
           }
         }
       }
@@ -686,15 +721,19 @@
         state.currentView = 'DUNGEON';
         const rooms = dungeonGen.generateRoomsForDungeon(d, state);
         state.dungeon = {
+          id: d.id,
+          name: d.name,
           currentRoom: 1,
           totalRooms: d.totalRooms,
           rooms: rooms,
           roomState: rooms[0]
         };
         if (rooms[0].type === 'monster' && rooms[0].monster) {
-          state.combat.active = true;
-          state.combat.monster = JSON.parse(JSON.stringify(rooms[0].monster));
-          state.combat.monster.currentHp = state.combat.monster.maxHp;
+          window.DOS.startCombat(state, rooms[0].monster, 'dungeon', {
+            dungeonId: d.id,
+            dungeonName: d.name,
+            roomIndex: 1
+          });
         }
       }
     }
@@ -744,6 +783,9 @@
 
       window.DOS.DebugSystem.init(state, render);
 
+      DOS.getState = () => state;
+      DOS.render = render;
+
       render();
     });
 
@@ -777,6 +819,10 @@
     });
     document.getElementById('nav-btn-dungeon').addEventListener('click', () => {
       if (!state || checkCombatViewBlock()) return;
+      if (!state.dungeon) {
+        showToast('You are not inside a dungeon!');
+        return;
+      }
       state.currentView = 'DUNGEON';
       render();
     });
@@ -844,6 +890,10 @@
 
       if (dState.currentRoom >= dState.totalRooms) {
         addLog('Leaving dungeon and returning to world map.', 'system');
+        if (dState.id) {
+          state.dungeons[dState.id] = { cleared: true, clearedOnDay: state.date.totalDays };
+        }
+        state.dungeon = null;
         state.currentView = 'WORLD_MAP';
         render();
         return;
@@ -856,9 +906,11 @@
       addLog(`Advanced to Room ${dState.currentRoom}: ${room.title}`, 'system');
 
       if (room.type === 'monster' && room.monster) {
-        state.combat.active = true;
-        state.combat.monster = JSON.parse(JSON.stringify(room.monster));
-        state.combat.monster.currentHp = state.combat.monster.maxHp;
+        window.DOS.startCombat(state, room.monster, 'dungeon', {
+          dungeonId: dState.id,
+          dungeonName: dState.name,
+          roomIndex: dState.currentRoom
+        });
         addLog(`Encountered ${room.monster.name}! ${room.monster.desc}`, 'enemy-crit');
       } else if (room.type === 'treasure') {
         const goldVal = room.gold || (15 + window.DOS.rollDie(20));
@@ -917,6 +969,11 @@
         addLog(`Escape attempt successful (Rolled ${runRoll} >= 10)! Fled from battle.`, 'heal');
         state.combat.active = false;
         state.combat.monster = null;
+        if (state.combat.context === 'dungeon') {
+          addLog('Fled from dungeon room back to safety.', 'system');
+          state.dungeon = null;
+        }
+        state.currentView = 'WORLD_MAP';
       } else {
         addLog(`Escape failed (Rolled ${runRoll} < 10)! Enemy attacks!`, 'enemy-hit');
         window.DOS.CombatSystem.executeEnemyTurn(state, addLog);
@@ -956,6 +1013,7 @@
 
     document.getElementById('btn-new-game').addEventListener('click', () => {
       if (confirm('Start a new game? Any unsaved progress will be lost.')) {
+        if (state) state.dungeon = null;
         state = null;
         document.getElementById('game-view').classList.add('hidden');
         document.getElementById('view-nav-bar').classList.add('hidden');
@@ -968,10 +1026,15 @@
     // Modal Buttons
     document.getElementById('btn-victory-continue').addEventListener('click', () => {
       document.getElementById('victory-modal').classList.add('hidden');
-      if (state) { state.currentView = 'WORLD_MAP'; render(); }
+      if (state) {
+        state.dungeon = null;
+        state.currentView = 'WORLD_MAP';
+        render();
+      }
     });
     document.getElementById('btn-victory-restart').addEventListener('click', () => {
       document.getElementById('victory-modal').classList.add('hidden');
+      if (state) state.dungeon = null;
       state = null;
       document.getElementById('game-view').classList.add('hidden');
       document.getElementById('view-nav-bar').classList.add('hidden');
@@ -979,6 +1042,7 @@
     });
     document.getElementById('btn-gameover-restart').addEventListener('click', () => {
       document.getElementById('gameover-modal').classList.add('hidden');
+      if (state) state.dungeon = null;
       state = null;
       document.getElementById('game-view').classList.add('hidden');
       document.getElementById('view-nav-bar').classList.add('hidden');

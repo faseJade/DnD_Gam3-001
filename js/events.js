@@ -14,7 +14,7 @@ window.DOS = window.DOS || {};
       dc: 12,
       onSuccess: 'You spot the ambush early and take high ground before combat begins!',
       onFail: 'You are caught off-guard as combat starts!',
-      triggerMonster: 'Goblin'
+      triggerMonster: 'Bandit'
     },
     {
       id: 'travelling_merchant',

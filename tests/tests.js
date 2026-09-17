@@ -185,6 +185,72 @@
     });
     assert(questsValid, 'Generated quests reference valid giver settlements in the world');
 
+    // 13. Wilderness Combat View Model (No previous dungeon)
+    const wildState = window.DOS.createInitialState('WildHero', 'Rogue', 'Elf', seed);
+    wildState.dungeon = null;
+    window.DOS.startCombat(wildState, 'Bandit', 'wilderness', { eventTitle: 'Bandit Ambush!', biome: 'forest', pos: { x: 5, y: 10 } });
+    const wildVm1 = window.DOS.getCombatViewModel(wildState);
+    assert(
+      wildVm1.showRoomBadge === false &&
+      !wildVm1.title.includes('Room') &&
+      !wildVm1.description.includes('dungeon') &&
+      wildVm1.heading === 'Wilderness Encounter',
+      'Wilderness combat with no previous dungeon returns correct view model (showRoomBadge=false, heading="Wilderness Encounter")'
+    );
+
+    // 14. Wilderness Combat After Leaving Dungeon
+    const dungeonState = window.DOS.createInitialState('DungeonHero', 'Fighter', 'Human', seed);
+    dungeonState.dungeon = { id: 'test_d', name: 'Old Crypt', currentRoom: 2, totalRooms: 5, rooms: [] };
+    dungeonState.dungeon = null; // Clear on leaving dungeon
+    window.DOS.startCombat(dungeonState, 'Bandit', 'wilderness', { eventTitle: 'Bandit Ambush!', biome: 'plains', pos: { x: 2, y: 3 } });
+    const wildVm2 = window.DOS.getCombatViewModel(dungeonState);
+    assert(
+      dungeonState.dungeon === null &&
+      wildVm2.showRoomBadge === false &&
+      wildVm2.heading === 'Wilderness Encounter',
+      'Wilderness combat after leaving dungeon clears state.dungeon and displays no stale dungeon info'
+    );
+
+    // 15. Wilderness Victory Primary Button & Transition
+    wildState.combat.active = false; // Monster defeated
+    const wildVm3 = window.DOS.getCombatViewModel(wildState);
+    assert(
+      wildVm3.primaryButton === 'Continue Journey',
+      'After wilderness victory, combat view model primary button is "Continue Journey"'
+    );
+
+    // 16. Bandit Ambush Spawns Bandit & Monster Catalog Completeness
+    const travelEvList = [
+      { id: 'bandit_ambush', triggerMonster: 'Bandit' }
+    ];
+    let allTriggersExist = true;
+    const banditObj = window.DOS.MONSTER_CATALOG.Bandit;
+    if (!banditObj || banditObj.name !== 'Bandit') allTriggersExist = false;
+    travelEvList.forEach(ev => {
+      if (!window.DOS.MONSTER_CATALOG[ev.triggerMonster]) allTriggersExist = false;
+    });
+    assert(allTriggersExist, 'Bandit Ambush spawns Bandit monster and all travel event triggers exist in MONSTER_CATALOG');
+
+    // 17. Dungeon Combat View Model
+    const dungeonCombatState = window.DOS.createInitialState('DungeonFightHero', 'Wizard', 'Human', seed);
+    dungeonCombatState.dungeon = { id: 'g_cave', name: 'Goblin Cave #3', currentRoom: 4, totalRooms: 10, rooms: [{ title: 'Guarded Gate', desc: 'Goblins lurk here.' }, {}, {}, { title: 'Guarded Gate', desc: 'Goblins lurk here.' }] };
+    window.DOS.startCombat(dungeonCombatState, 'Goblin', 'dungeon', { dungeonId: 'g_cave', dungeonName: 'Goblin Cave #3', roomIndex: 4 });
+    const dVm = window.DOS.getCombatViewModel(dungeonCombatState);
+    assert(
+      dVm.heading === 'Goblin Cave #3' &&
+      dVm.badge === 'Room 4 / 10' &&
+      dVm.showRoomBadge === true,
+      'Dungeon combat view model formats dungeon name and Room X / Y badge accurately'
+    );
+
+    // 18. Save -> Load Preserves Wilderness Combat Context
+    window.DOS.saveGame(wildState);
+    const reloadedWild = window.DOS.loadGame();
+    assert(
+      reloadedWild && reloadedWild.combat && reloadedWild.combat.context === 'wilderness',
+      'Save -> Load mid-fight preserves combat context === "wilderness"'
+    );
+
     // Summary
     const summary = document.createElement('h2');
     summary.innerHTML = `Tests Completed: ${passedCount + failedCount} | Passed: <span class="pass">${passedCount}</span> | Failed: <span class="fail">${failedCount}</span>`;

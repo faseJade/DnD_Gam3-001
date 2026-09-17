@@ -5,6 +5,93 @@ window.DOS = window.DOS || {};
 (function (DOS) {
   'use strict';
 
+  const BIOME_DESCRIPTIONS = {
+    plains: 'Tall grass sways around you on the open plains.',
+    grass: 'Gentle grassy hills stretch toward the horizon.',
+    forest: 'Ancient towering trees cast long, dark shadows around you.',
+    swamp: 'Misty, foul-smelling waters pool beneath gnarly mangrove roots.',
+    desert: 'Scorching sands shift underfoot beneath a blazing sun.',
+    mountain: 'Jagged granite crags and cold mountain winds surround the rocky trail.',
+    snow: 'Freezing drifts of snow blanket the barren landscape.',
+    hills: 'Rolling wind-swept hills offer little cover from predators.',
+    tundra: 'Frozen sub-zero tundra stretches out beneath grey skies.'
+  };
+
+  function startCombat(state, monsterKeyOrObj, context = 'dungeon', meta = {}) {
+    if (!state) return;
+    let monster = null;
+    if (typeof monsterKeyOrObj === 'string') {
+      const tpl = DOS.MONSTER_CATALOG[monsterKeyOrObj] || DOS.MONSTER_CATALOG.Goblin;
+      monster = JSON.parse(JSON.stringify(tpl));
+    } else if (monsterKeyOrObj && typeof monsterKeyOrObj === 'object') {
+      monster = JSON.parse(JSON.stringify(monsterKeyOrObj));
+    }
+
+    if (!monster) return;
+    if (typeof monster.currentHp !== 'number') monster.currentHp = monster.maxHp;
+
+    if (!state.combat) {
+      state.combat = { active: false, context: null, isPlayerDefending: false, monster: null, meta: {} };
+    }
+
+    state.combat.active = true;
+    state.combat.context = context; // 'wilderness' | 'dungeon'
+    state.combat.monster = monster;
+    state.combat.isPlayerDefending = false;
+    state.combat.meta = meta || {};
+    state.currentView = 'DUNGEON';
+  }
+
+  function getCombatViewModel(state) {
+    if (!state) {
+      return {
+        heading: 'Combat',
+        title: 'Chamber',
+        badge: '',
+        description: 'No active combat.',
+        showRoomBadge: false,
+        primaryButton: 'Continue Journey'
+      };
+    }
+
+    const cState = state.combat || {};
+    const context = cState.context || (state.dungeon ? 'dungeon' : 'wilderness');
+
+    if (context === 'wilderness') {
+      const meta = cState.meta || {};
+      const biome = meta.biome || 'wilderness';
+      const eventTitle = meta.eventTitle || 'Wilderness Ambush!';
+      const pos = meta.pos || state.playerPos || { x: 0, y: 0 };
+      const biomeDesc = BIOME_DESCRIPTIONS[biome.toLowerCase()] || 'The wild untamed wilderness surrounds you.';
+
+      return {
+        heading: 'Wilderness Encounter',
+        title: `Wilderness Encounter: ${eventTitle}`,
+        badge: `${biome.charAt(0).toUpperCase() + biome.slice(1)} (${pos.x}, ${pos.y})`,
+        description: biomeDesc,
+        showRoomBadge: false,
+        primaryButton: 'Continue Journey'
+      };
+    }
+
+    // Dungeon Context
+    const dState = state.dungeon || {};
+    const dName = dState.name || 'Dungeon of Shadows';
+    const currentRoom = dState.currentRoom || 1;
+    const totalRooms = dState.totalRooms || 10;
+    const rooms = dState.rooms || [];
+    const room = rooms[currentRoom - 1] || dState.roomState || {};
+
+    return {
+      heading: dName,
+      title: room.title || 'Dungeon Chamber',
+      badge: `Room ${currentRoom} / ${totalRooms}`,
+      description: room.desc || 'A dark subterranean corridor echoing with footsteps.',
+      showRoomBadge: true,
+      primaryButton: currentRoom >= totalRooms && (!cState.active) ? 'Exit Dungeon' : 'Proceed to Next Room'
+    };
+  }
+
   class CombatSystem {
     static calculatePlayerAttack(state) {
       if (!state || !state.character) return 0;
@@ -131,6 +218,10 @@ window.DOS = window.DOS || {};
       state.combat.active = false;
       state.combat.monster = null;
 
+      if (state.combat.context === 'wilderness') {
+        logCallback(`You defeated the ${monster.name}. The road is clear.`, 'heal');
+      }
+
       if (monster.isBoss || monster.name === 'Dark Knight') {
         logCallback(`The Dark Knight has fallen! You have conquered the Dungeon of Shadows!`, 'player-crit');
         if (typeof window.showVictoryModal === 'function') {
@@ -167,5 +258,7 @@ window.DOS = window.DOS || {};
   }
 
   DOS.CombatSystem = CombatSystem;
+  DOS.startCombat = startCombat;
+  DOS.getCombatViewModel = getCombatViewModel;
 
 })(window.DOS);

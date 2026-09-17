@@ -114,8 +114,10 @@ window.DOS = window.DOS || {};
       worldEvents: [],
       combat: {
         active: false,
+        context: null, // 'wilderness' | 'dungeon' | null
         isPlayerDefending: false,
         monster: null,
+        meta: {},
         statusEffects: { player: [], monster: [] }
       },
       fogOfWar: '', // Encoded bitset

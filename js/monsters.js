@@ -16,6 +16,26 @@ window.DOS = window.DOS || {};
       xpReward: 30,
       goldReward: 12
     },
+    Bandit: {
+      name: 'Bandit',
+      desc: 'A ruthless highwayman clad in leather armor, wielding a sharp shortsword.',
+      maxHp: 22,
+      attackBonus: 3,
+      defense: 11,
+      damageDice: '1d6+2',
+      xpReward: 50,
+      goldReward: 25
+    },
+    DireWolf: {
+      name: 'Dire Wolf',
+      desc: 'A massive dark wolf with glowing yellow eyes and lethal fangs.',
+      maxHp: 24,
+      attackBonus: 4,
+      defense: 12,
+      damageDice: '1d8+2',
+      xpReward: 55,
+      goldReward: 0
+    },
     Skeleton: {
       name: 'Skeleton',
       desc: 'Animated bones rattling in the dark with an old iron shortsword.',
